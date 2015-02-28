@@ -3,8 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/allanks/third-game/src/Terrain"
 	"github.com/go-gl/glfw/v3.1/glfw"
-	"github.com/go-gl/glow/gl-core/3.3/gl"
+	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"runtime"
 	"strings"
@@ -41,8 +42,10 @@ func initializeWindow() {
 	defer glfw.Terminate()
 
 	glfw.WindowHint(glfw.Resizable, glfw.False)
-	glfw.WindowHint(glfw.ContextVersionMajor, 3)
-	glfw.WindowHint(glfw.ContextVersionMinor, 3)
+	glfw.WindowHint(glfw.ContextVersionMajor, 4)
+	glfw.WindowHint(glfw.ContextVersionMinor, 5)
+	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
+	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 	window, err := glfw.CreateWindow(WindowWidth, WindowHeight, "Cube", nil, nil)
 	if err != nil {
 		panic(err)
@@ -101,16 +104,36 @@ func initOpenGLProgram(window *glfw.Window) {
 	cameraUniform := gl.GetUniformLocation(program, gl.Str("camera\x00"))
 	gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 
-	model := mgl32.Ident4()
-	modelUniform := gl.GetUniformLocation(program, gl.Str("model\x00"))
-	gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+	rotate := mgl32.Ident4()
+	rotateUniform := gl.GetUniformLocation(program, gl.Str("rotate\x00"))
+	gl.UniformMatrix4fv(rotateUniform, 1, false, &rotate[0])
+
+	translateUniform := gl.GetUniformLocation(program, gl.Str("translate\x00"))
+	gl.Uniform4f(translateUniform, 0.0, 0.0, 0.0, 0.0)
+
+	textureUniform := gl.GetUniformLocation(program, gl.Str("tex\x00"))
+	gl.Uniform1i(textureUniform, 0)
+
+	vertAttrib := uint32(gl.GetAttribLocation(program, gl.Str("vert\x00")))
+	texCoordAttrib := uint32(gl.GetAttribLocation(program, gl.Str("vertTexCoord\x00")))
 
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
+
+	cube1 := Terrain.GenCube(0, -1, 0)
+	cube2 := Terrain.GenCube(1, -1, 0)
+	Terrain.InitCube()
+
+	gl.Enable(gl.DEPTH_TEST)
+	gl.DepthFunc(gl.LESS)
+	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
+
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		gl.UseProgram(program)
-		gl.UniformMatrix4fv(modelUniform, 1, false, &model[0])
+
+		Terrain.Render(cube1, vertAttrib, texCoordAttrib, translateUniform)
+		Terrain.Render(cube2, vertAttrib, texCoordAttrib, translateUniform)
 
 		window.SwapBuffers()
 		glfw.PollEvents()
@@ -189,7 +212,8 @@ var vertexShader string = `
 
 uniform mat4 projection;
 uniform mat4 camera;
-uniform mat4 model;
+uniform mat4 rotate;
+uniform vec4 translate;
 
 in vec3 vert;
 in vec2 vertTexCoord;
@@ -198,7 +222,7 @@ out vec2 fragTexCoord;
 
 void main() {
     fragTexCoord = vertTexCoord;
-    gl_Position = projection * camera * model * vec4(vert, 1);
+    gl_Position = projection * camera * rotate * (vec4(vert, 1) + translate);
 }
 ` + "\x00"
 
