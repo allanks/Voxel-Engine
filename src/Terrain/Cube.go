@@ -14,6 +14,10 @@ func (cube *Cube) setPos(xPos, yPos, zPos int32) {
 	cube.zPos = zPos
 }
 
+func (cube *Cube) CheckCubeCollision(xPos, yPos, zPos int32) bool {
+	return xPos == cube.xPos && yPos == cube.yPos && zPos == cube.zPos
+}
+
 func GenCube(x, y, z int32) *Cube {
 	return &Cube{x, y, z}
 }

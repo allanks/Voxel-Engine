@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/allanks/third-game/src/Graphics"
 	"github.com/allanks/third-game/src/Terrain"
 	"github.com/go-gl/glfw/v3.1/glfw"
 	"github.com/go-gl/glow/gl-core/4.5/gl"
@@ -119,21 +120,21 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
-	cube1 := Terrain.GenCube(0, -1, 0)
-	cube2 := Terrain.GenCube(1, -1, 0)
+	Terrain.GenLevel(0, 0, 0)
+
 	Terrain.InitCube()
 
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
-	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
 
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		gl.UseProgram(program)
 
-		Terrain.Render(cube1, vertAttrib, texCoordAttrib, translateUniform)
-		Terrain.Render(cube2, vertAttrib, texCoordAttrib, translateUniform)
+		Graphics.Render(vertAttrib, texCoordAttrib)
+
+		Terrain.RenderLevel(vertAttrib, texCoordAttrib, translateUniform)
 
 		window.SwapBuffers()
 		glfw.PollEvents()
