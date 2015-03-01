@@ -2,6 +2,7 @@ package Terrain
 
 import (
 	"math/rand"
+	"time"
 )
 
 var (
@@ -10,7 +11,7 @@ var (
 
 func GenLevel(xPos, yPos, zPos int32) {
 
-	cubes = append(cubes, GenCube(xPos, yPos-1, zPos))
+	cubes = append(cubes, GenCube(xPos, yPos, zPos))
 	genPaths(cubes[0], 10)
 }
 
@@ -19,9 +20,9 @@ func genPaths(cube *Cube, pathLength int32) {
 	if pathLength == 0 {
 		return
 	}
-
-	genPath(cube, int32(rand.Intn(6)), pathLength)
-	genPath(cube, int32(rand.Intn(6)), pathLength)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	genPath(cube, int32(r.Intn(6)), pathLength)
+	genPath(cube, int32(r.Intn(6)), pathLength)
 
 }
 

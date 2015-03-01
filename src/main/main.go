@@ -1,19 +1,20 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"github.com/allanks/third-game/src/Graphics"
+	"github.com/allanks/third-game/src/Player"
 	"github.com/allanks/third-game/src/Terrain"
 	"github.com/go-gl/glfw/v3.1/glfw"
 	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"runtime"
-	"strings"
 	"unsafe"
 )
 
-var ()
+var (
+	eyeVec, viewVec mgl32.Vec3
+)
 
 const WindowWidth = 800
 const WindowHeight = 600
@@ -52,6 +53,8 @@ func initializeWindow() {
 		panic(err)
 	}
 	window.MakeContextCurrent()
+	window.SetCursorPos(0, 0)
+	window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
 
 	// Initialize Glow
 	if err := gl.Init(); err != nil {
@@ -77,31 +80,28 @@ func initializeWindow() {
 		// Trigger an error to demonstrate debug output
 		gl.Enable(gl.CONTEXT_FLAGS)
 	}
-	window.SetKeyCallback(onKey)
+	window.SetKeyCallback(Player.OnKey)
+	window.SetCursorPosCallback(Player.OnCursor)
 	initOpenGLProgram(window)
-}
-
-func onKey(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw.ModifierKey) {
-	switch glfw.Key(k) {
-	case glfw.KeyEscape:
-
-	}
 }
 
 func initOpenGLProgram(window *glfw.Window) {
 
 	// Configure the vertex and fragment shaders
-	program, err := newProgram(vertexShader, fragmentShader)
+	program, err := Graphics.NewProgram(vertexShader, fragmentShader)
 	if err != nil {
 		panic(err)
 	}
 	gl.UseProgram(program)
 
+	Terrain.GenLevel(0, -5, 0)
+	Player.GenPlayer()
+
 	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 10.0)
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
 	gl.UniformMatrix4fv(projectionUniform, 1, false, &projection[0])
 
-	camera := mgl32.LookAtV(mgl32.Vec3{3, 3, 3}, mgl32.Vec3{0, 0, 0}, mgl32.Vec3{0, 1, 0})
+	camera := Player.GetCameraMatrix()
 	cameraUniform := gl.GetUniformLocation(program, gl.Str("camera\x00"))
 	gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 
@@ -120,8 +120,6 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
-	Terrain.GenLevel(0, 0, 0)
-
 	Terrain.InitCube()
 
 	gl.Enable(gl.DEPTH_TEST)
@@ -132,7 +130,8 @@ func initOpenGLProgram(window *glfw.Window) {
 
 		gl.UseProgram(program)
 
-		Graphics.Render(vertAttrib, texCoordAttrib)
+		camera := Player.GetCameraMatrix()
+		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 
 		Terrain.RenderLevel(vertAttrib, texCoordAttrib, translateUniform)
 
@@ -149,63 +148,6 @@ func main() {
 
 	go startProgram()
 	initializeWindow()
-}
-
-func newProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
-	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
-	if err != nil {
-		return 0, err
-	}
-
-	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
-	if err != nil {
-		return 0, err
-	}
-
-	program := gl.CreateProgram()
-
-	gl.AttachShader(program, vertexShader)
-	gl.AttachShader(program, fragmentShader)
-	gl.LinkProgram(program)
-
-	var status int32
-	gl.GetProgramiv(program, gl.LINK_STATUS, &status)
-	if status == gl.FALSE {
-		var logLength int32
-		gl.GetProgramiv(program, gl.INFO_LOG_LENGTH, &logLength)
-
-		log := strings.Repeat("\x00", int(logLength+1))
-		gl.GetProgramInfoLog(program, logLength, nil, gl.Str(log))
-
-		return 0, errors.New(fmt.Sprintf("failed to link program: %v", log))
-	}
-
-	gl.DeleteShader(vertexShader)
-	gl.DeleteShader(fragmentShader)
-
-	return program, nil
-}
-
-func compileShader(source string, shaderType uint32) (uint32, error) {
-	shader := gl.CreateShader(shaderType)
-
-	csource := gl.Str(source)
-	gl.ShaderSource(shader, 1, &csource, nil)
-	gl.CompileShader(shader)
-
-	var status int32
-	gl.GetShaderiv(shader, gl.COMPILE_STATUS, &status)
-	if status == gl.FALSE {
-		var logLength int32
-		gl.GetShaderiv(shader, gl.INFO_LOG_LENGTH, &logLength)
-
-		log := strings.Repeat("\x00", int(logLength+1))
-		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
-
-		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
-	}
-
-	return shader, nil
 }
 
 var vertexShader string = `
