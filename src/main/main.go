@@ -121,6 +121,7 @@ func initOpenGLProgram(window *glfw.Window) {
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
 	Terrain.InitCube()
+	Graphics.InitSkybox()
 
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
@@ -132,6 +133,10 @@ func initOpenGLProgram(window *glfw.Window) {
 
 		camera := Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
+
+		x, y, z := Player.GetPosition()
+		gl.Uniform4f(translateUniform, x, y, z, 0.0)
+		Graphics.RenderSkybox(vertAttrib, texCoordAttrib, translateUniform)
 
 		Terrain.RenderLevel(vertAttrib, texCoordAttrib, translateUniform)
 
