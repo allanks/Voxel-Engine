@@ -36,6 +36,7 @@ func Render(cube *Cube, vertAttrib, texCoordAttrib uint32, translateUniform int3
 	gl.VertexAttribPointer(texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
 
 	gl.BindVertexArray(vertexArrayObject)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBufferObject)
 
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
