@@ -97,7 +97,7 @@ func initOpenGLProgram(window *glfw.Window) {
 	Terrain.GenLevel(0, -5, 0)
 	Player.GenPlayer()
 
-	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 10.0)
+	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 100.0)
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
 	gl.UniformMatrix4fv(projectionUniform, 1, false, &projection[0])
 

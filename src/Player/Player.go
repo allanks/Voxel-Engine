@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	user             player
-	moving, strafing chan float32
+	user                                                       player
+	movingForward, movingBackward, strafingLeft, strafingRight chan float32
 )
 
 const (
@@ -24,10 +24,14 @@ type moveFunc func(float32)
 
 func GenPlayer() {
 	user = player{0.0, 0.0, 0.0, -180.0, 0.0}
-	moving = make(chan float32)
-	strafing = make(chan float32)
-	go loopMove(move, moving)
-	go loopMove(strafe, strafing)
+	movingForward = make(chan float32)
+	movingBackward = make(chan float32)
+	strafingLeft = make(chan float32)
+	strafingRight = make(chan float32)
+	go loopMove(move, movingForward)
+	go loopMove(move, movingBackward)
+	go loopMove(strafe, strafingLeft)
+	go loopMove(strafe, strafingRight)
 }
 
 func GetPosition() (float32, float32, float32) {
@@ -97,27 +101,27 @@ func OnKey(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw
 		window.SetShouldClose(true)
 	case glfw.KeyW:
 		if action == glfw.Press {
-			moving <- forward
+			movingForward <- forward
 		} else if action == glfw.Release {
-			moving <- stop
+			movingForward <- stop
 		}
 	case glfw.KeyA:
 		if action == glfw.Press {
-			strafing <- forward
+			strafingLeft <- forward
 		} else if action == glfw.Release {
-			strafing <- stop
+			strafingLeft <- stop
 		}
 	case glfw.KeyS:
 		if action == glfw.Press {
-			moving <- backwards
+			movingBackward <- backwards
 		} else if action == glfw.Release {
-			moving <- stop
+			movingBackward <- stop
 		}
 	case glfw.KeyD:
 		if action == glfw.Press {
-			strafing <- backwards
+			strafingRight <- backwards
 		} else if action == glfw.Release {
-			strafing <- stop
+			strafingRight <- stop
 		}
 	}
 }
