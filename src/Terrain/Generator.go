@@ -1,57 +1,85 @@
 package Terrain
 
 import (
-	"math/rand"
-	"time"
+	"log"
+	"os"
+	"sync"
+
+	"gopkg.in/mgo.v2"
+)
+
+const (
+	mongodb string = "localhost:27017"
 )
 
 var (
 	cubes []*Cube
 )
 
+type ()
+
 func GenLevel(xPos, yPos, zPos int32) {
 
-	cubes = append(cubes, GenCube(xPos, yPos, zPos))
-	genPaths(cubes[0], 10)
-}
+	f, err := os.OpenFile("LevelGen.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
 
-func genPaths(cube *Cube, pathLength int32) {
+	var mongoSession *mgo.Session
+	mongoSession, err = mgo.Dial(mongodb)
+	if err != nil {
+		log.Fatalf("CreateSession: %s\n", err)
+	}
+	defer mongoSession.Close()
 
-	if pathLength == 0 {
+	var count int
+	collection := mongoSession.DB("GameDatabase").C("Cubes")
+	count, err = collection.Count()
+	if err != nil {
+		log.Fatalf("Count Failed: %s\n", err)
+	}
+	if count == 0 {
+		var waitGroup sync.WaitGroup
+		waitGroup.Add(7)
+		go genLayer(0, -1, 0, 5, &waitGroup, mongoSession)
+		go genLayer(0, -2, 0, 6, &waitGroup, mongoSession)
+		go genLayer(0, -3, 0, 7, &waitGroup, mongoSession)
+		go genLayer(0, -4, 0, 8, &waitGroup, mongoSession)
+		go genLayer(0, -5, 0, 7, &waitGroup, mongoSession)
+		go genLayer(0, -6, 0, 6, &waitGroup, mongoSession)
+		go genLayer(0, -7, 0, 5, &waitGroup, mongoSession)
+		waitGroup.Wait()
+	}
+
+	err = collection.Find(nil).All(&cubes)
+	if err != nil {
+		log.Printf("RunQuery : ERROR : %s\n", err)
 		return
 	}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	genPath(cube, int32(r.Intn(6)), pathLength)
-	genPath(cube, int32(r.Intn(6)), pathLength)
 
 }
 
-func genPath(cube *Cube, decision, pathLength int32) {
-
-	xPos, yPos, zPos := cube.GetPos()
-	switch decision / 2 {
-	case 0:
-		xPos += (-1 + (decision % 2)) + (decision % 2)
-	case 1:
-		yPos -= (decision % 2)
-	case 2:
-		zPos += (-1 + (decision % 2)) + (decision % 2)
-	}
-	if !checkCubeCollisions(xPos, yPos, zPos) {
-		newCube := GenCube(xPos, yPos, zPos)
-		cubes = append(cubes, newCube)
-		genPaths(newCube, pathLength-1)
+func genLayer(xPos, yPos, zPos, size int32, waitGroup *sync.WaitGroup, mongoSession *mgo.Session) {
+	defer waitGroup.Done()
+	for i := -size; i < size; i++ {
+		go genRow(yPos, i, size, mongoSession)
 	}
 }
 
-func checkCubeCollisions(xPos, yPos, zPos int32) bool {
+func genRow(yPos, zPos, size int32, mongoSession *mgo.Session) {
+	session := mongoSession.Copy()
+	defer session.Close()
+	collection := session.DB("GameDatabase").C("Cubes")
 
-	for _, cube := range cubes {
-		if cube.CheckCubeCollision(xPos, yPos, zPos) {
-			return true
+	for i := -size; i < size; i++ {
+		log.Printf("Creating Cube %v\n", &Cube{XPos: i, YPos: yPos, ZPos: zPos})
+		err := collection.Insert(&Cube{XPos: i, YPos: yPos, ZPos: zPos})
+		if err != nil {
+			log.Printf("RunQuery : ERROR : %s\n", err)
 		}
 	}
-	return false
 }
 
 func RenderLevel(vertAttrib, texCoordAttrib uint32, translateUniform int32) {

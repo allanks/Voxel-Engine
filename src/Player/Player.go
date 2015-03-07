@@ -1,10 +1,11 @@
 package Player
 
 import (
-	"github.com/go-gl/glfw/v3.1/glfw"
-	"github.com/go-gl/mathgl/mgl32"
 	m "math"
 	"time"
+
+	"github.com/go-gl/glfw/v3.1/glfw"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 var (

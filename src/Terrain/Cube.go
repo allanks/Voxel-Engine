@@ -1,23 +1,22 @@
 package Terrain
 
+import (
+	"gopkg.in/mgo.v2/bson"
+)
+
 type Cube struct {
-	xPos, yPos, zPos int32
+	ID   bson.ObjectId `bson:"_id,omitempty"`
+	XPos int32
+	YPos int32
+	ZPos int32
 }
 
 func (cube *Cube) GetPos() (int32, int32, int32) {
-	return cube.xPos, cube.yPos, cube.zPos
+	return cube.XPos, cube.YPos, cube.ZPos
 }
 
 func (cube *Cube) setPos(xPos, yPos, zPos int32) {
-	cube.xPos = xPos
-	cube.yPos = yPos
-	cube.zPos = zPos
-}
-
-func (cube *Cube) CheckCubeCollision(xPos, yPos, zPos int32) bool {
-	return xPos == cube.xPos && yPos == cube.yPos && zPos == cube.zPos
-}
-
-func GenCube(x, y, z int32) *Cube {
-	return &Cube{x, y, z}
+	cube.XPos = xPos
+	cube.YPos = yPos
+	cube.ZPos = zPos
 }
