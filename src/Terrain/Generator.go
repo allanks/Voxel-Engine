@@ -1,9 +1,12 @@
 package Terrain
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"sync"
+
+	"github.com/allanks/third-game/src/Player"
 
 	"gopkg.in/mgo.v2"
 )
@@ -16,7 +19,12 @@ var (
 	cubes []*Cube
 )
 
-type ()
+func CheckPlayerCollisions() {
+	for _, cube := range cubes {
+		x, y, z := Player.GetPosition()
+		Player.SetPosistion(cube.CheckCollision(x, y, z, Player.GetPlayerSpeed()))
+	}
+}
 
 func GenLevel(xPos, yPos, zPos int32) {
 
@@ -74,8 +82,8 @@ func genRow(yPos, zPos, size int32, mongoSession *mgo.Session) {
 	collection := session.DB("GameDatabase").C("Cubes")
 
 	for i := -size; i < size; i++ {
-		log.Printf("Creating Cube %v\n", &Cube{XPos: i, YPos: yPos, ZPos: zPos})
-		err := collection.Insert(&Cube{XPos: i, YPos: yPos, ZPos: zPos})
+		log.Printf("Creating Cube %v\n", &Cube{XPos: float64(i), YPos: float64(yPos), ZPos: float64(zPos)})
+		err := collection.Insert(&Cube{XPos: float64(i), YPos: float64(yPos), ZPos: float64(zPos)})
 		if err != nil {
 			log.Printf("RunQuery : ERROR : %s\n", err)
 		}
@@ -86,5 +94,11 @@ func RenderLevel(vertAttrib, texCoordAttrib uint32, translateUniform int32) {
 
 	for _, cube := range cubes {
 		Render(cube, vertAttrib, texCoordAttrib, translateUniform)
+	}
+}
+
+func PrintCubePos() {
+	for _, cube := range cubes {
+		fmt.Printf("%v\n", cube)
 	}
 }

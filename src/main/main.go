@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
+	"runtime"
+	"unsafe"
+
 	"github.com/allanks/third-game/src/Graphics"
 	"github.com/allanks/third-game/src/Player"
 	"github.com/allanks/third-game/src/Terrain"
 	"github.com/go-gl/glfw/v3.1/glfw"
 	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"github.com/go-gl/mathgl/mgl32"
-	"runtime"
-	"unsafe"
 )
 
 var (
@@ -122,6 +123,7 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	Terrain.InitCube()
 	Graphics.InitSkybox()
+	Terrain.PrintCubePos()
 
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
@@ -134,8 +136,9 @@ func initOpenGLProgram(window *glfw.Window) {
 		camera := Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 
+		Terrain.CheckPlayerCollisions()
 		x, y, z := Player.GetPosition()
-		gl.Uniform4f(translateUniform, x, y, z, 0.0)
+		gl.Uniform4f(translateUniform, float32(x), float32(y), float32(z), 0.0)
 		Graphics.RenderSkybox(vertAttrib, texCoordAttrib, translateUniform)
 
 		Terrain.RenderLevel(vertAttrib, texCoordAttrib, translateUniform)
