@@ -1,6 +1,7 @@
 package Player
 
 import (
+	"fmt"
 	m "math"
 
 	"github.com/allanks/third-game/src/Terrain"
@@ -9,27 +10,41 @@ import (
 )
 
 var (
-	user player
+	user          player
+	lastFrameTime float64
 )
 
 const (
-	forward, backwards, turnSpeed, moveSpeed, stop, Height, terminalVelocity float64 = 1, -1, 0.5, 0.1, 0, 1, 10
+	forward,
+	backwards,
+	turnSpeed,
+	moveSpeed,
+	stop,
+	Height,
+	terminalVelocity,
+	jumpSpeed,
+	gravity float64 = 1, -1, 0.5, 0.1, 0, 1, -10, 2, 9.8
 )
 
 type player struct {
 	xPos, yPos, zPos, pitch, turn, fall float64
-	freeMovement                        bool
+	freeMovement, isFalling             bool
 }
 
 type moveFunc func(float64)
 
 func GenPlayer() {
-	user = player{0.0, 1.0 + Height, 0.0, -180.0, 0.0, 0.0, false}
+	lastFrameTime = glfw.GetTime()
+	user = player{0.0, 1.0, 0.0, -180.0, 0.0, 0.0, false, true}
 }
 
 func MovePlayer(window *glfw.Window) {
-	bottomCubes := Terrain.FindNearestCubes(m.Floor(user.xPos), m.Floor(user.yPos-Height), m.Floor(user.zPos))
-	topCubes := Terrain.FindNearestCubes(m.Floor(user.xPos), m.Floor(user.yPos), m.Floor(user.zPos))
+	frameTime := glfw.GetTime()
+	frameRate := frameTime - lastFrameTime
+	lastFrameTime = frameTime
+	feetX, feetY, feetZ := m.Floor(user.xPos), m.Floor(user.yPos), m.Floor(user.zPos)
+	bottomCubes := Terrain.FindNearestCubes(feetX, feetY, feetZ)
+	topCubes := Terrain.FindNearestCubes(m.Floor(user.xPos), m.Floor(user.yPos+Height), m.Floor(user.zPos))
 	if window.GetKey(glfw.KeyW) == glfw.Press {
 		move(1, bottomCubes, topCubes)
 	}
@@ -42,11 +57,42 @@ func MovePlayer(window *glfw.Window) {
 	if window.GetKey(glfw.KeyD) == glfw.Press {
 		strafe(-1, bottomCubes, topCubes)
 	}
-	if window.GetKey(glfw.KeySpace) == glfw.Press {
-		jump(1, bottomCubes, topCubes)
+	switch {
+	case window.GetKey(glfw.KeySpace) == glfw.Press && user.freeMovement:
+		user.yPos = user.yPos + (1 * moveSpeed)
+	case window.GetKey(glfw.KeyLeftShift) == glfw.Press && user.freeMovement:
+		user.yPos = user.yPos + (-1 * moveSpeed)
+	case !user.freeMovement:
+		if Terrain.IsInCube(m.Floor(user.xPos), m.Floor(user.yPos+(user.fall*moveSpeed))-1, m.Floor(user.zPos)) {
+			user.isFalling = false
+			user.fall = 0.0
+			user.yPos = m.Floor(user.yPos)
+		} else {
+			user.isFalling = true
+		}
+		if user.isFalling {
+			user.yPos = user.yPos + (user.fall * moveSpeed)
+			if user.fall > terminalVelocity {
+				user.fall = user.fall - (gravity * frameRate)
+			}
+		}
 	}
-	if window.GetKey(glfw.KeyLeftShift) == glfw.Press {
-		jump(-1, bottomCubes, topCubes)
+	if Terrain.IsInCube(user.xPos, user.yPos-1, user.zPos) {
+		fmt.Printf("%v%v\n", "Serious error occured, fixing", user)
+		selectEdge := func(a float64) float64 {
+			if a < 0.5 {
+				return m.Floor(a)
+			} else {
+				return m.Floor(a + 1)
+			}
+		}
+		if (m.Abs(user.xPos-0.5) > m.Abs(user.yPos-0.5)) && (m.Abs(user.xPos-0.5) > m.Abs(user.zPos-0.5)) {
+			user.xPos = selectEdge(user.xPos)
+		} else if m.Abs(user.yPos-0.5) > m.Abs(user.zPos-0.5) {
+			user.yPos = selectEdge(user.yPos)
+		} else {
+			user.zPos = selectEdge(user.zPos)
+		}
 	}
 }
 
@@ -69,22 +115,28 @@ func GetCameraMatrix() mgl32.Mat4 {
 }
 
 func move(direction float64, bottomCubes, topCubes []Terrain.Cube) {
-	xLook := float64(m.Sin(float64(user.pitch)*m.Pi/180) * m.Cos(float64(user.turn)*m.Pi/180))
-	zLook := float64(m.Sin(float64(user.pitch)*m.Pi/180) * m.Sin(float64(user.turn)*m.Pi/180))
+	var xLook, zLook float64
+	if user.freeMovement {
+		xLook = -1 * float64(m.Sin(float64(user.pitch)*m.Pi/180)*m.Cos(float64(user.turn)*m.Pi/180))
+		zLook = -1 * float64(m.Sin(float64(user.pitch)*m.Pi/180)*m.Sin(float64(user.turn)*m.Pi/180))
+	} else {
+		xLook = float64(m.Cos(float64(user.turn) * m.Pi / 180))
+		zLook = float64(m.Sin(float64(user.turn) * m.Pi / 180))
+	}
 	yLook := -1 * float64(m.Cos(float64(-1*user.pitch)*m.Pi/180))
-	newX := user.xPos + (direction * xLook * moveSpeed)
+	newX := user.xPos - (direction * xLook * moveSpeed)
 	newY := user.yPos + (direction * yLook * moveSpeed)
-	newZ := user.zPos + (direction * zLook * moveSpeed)
-	if CheckPlayerCollisions(newX, user.yPos, user.zPos, topCubes) &&
-		CheckPlayerCollisions(newX, user.yPos-Height, user.zPos, bottomCubes) {
+	newZ := user.zPos - (direction * zLook * moveSpeed)
+	if CheckPlayerCollisions(newX, user.yPos+Height, user.zPos, topCubes) &&
+		CheckPlayerCollisions(newX, user.yPos, user.zPos, bottomCubes) {
 		user.xPos = newX
 	}
-	if user.freeMovement && CheckPlayerCollisions(user.xPos, newY, user.zPos, topCubes) &&
-		CheckPlayerCollisions(user.xPos, newY-Height, user.zPos, bottomCubes) {
+	if user.freeMovement && CheckPlayerCollisions(user.xPos, newY+Height, user.zPos, topCubes) &&
+		CheckPlayerCollisions(user.xPos, newY, user.zPos, bottomCubes) {
 		user.yPos = newY
 	}
-	if CheckPlayerCollisions(user.xPos, user.yPos, newZ, topCubes) &&
-		CheckPlayerCollisions(user.xPos, user.yPos-Height, newZ, bottomCubes) {
+	if CheckPlayerCollisions(user.xPos, user.yPos+Height, newZ, topCubes) &&
+		CheckPlayerCollisions(user.xPos, user.yPos, newZ, bottomCubes) {
 		user.zPos = newZ
 	}
 }
@@ -95,21 +147,13 @@ func strafe(direction float64, bottomCubes, topCubes []Terrain.Cube) {
 	newX := user.xPos + (-1 * direction * zLook * moveSpeed)
 	newZ := user.zPos + (direction * xLook * moveSpeed)
 
-	if CheckPlayerCollisions(newX, user.yPos, user.zPos, topCubes) &&
-		CheckPlayerCollisions(newX, user.yPos-Height, user.zPos, bottomCubes) {
+	if CheckPlayerCollisions(newX, user.yPos+Height, user.zPos, topCubes) &&
+		CheckPlayerCollisions(newX, user.yPos, user.zPos, bottomCubes) {
 		user.xPos = newX
 	}
-	if CheckPlayerCollisions(user.xPos, user.yPos, newZ, topCubes) &&
-		CheckPlayerCollisions(user.xPos, user.yPos-Height, newZ, bottomCubes) {
+	if CheckPlayerCollisions(user.xPos, user.yPos+Height, newZ, topCubes) &&
+		CheckPlayerCollisions(user.xPos, user.yPos, newZ, bottomCubes) {
 		user.zPos = newZ
-	}
-}
-
-func jump(direction float64, bottomCubes, topCubes []Terrain.Cube) {
-	newY := user.yPos + (direction * moveSpeed)
-	if CheckPlayerCollisions(user.xPos, newY, user.zPos, topCubes) &&
-		CheckPlayerCollisions(user.xPos, newY-Height, user.zPos, bottomCubes) {
-		user.yPos = newY
 	}
 }
 
@@ -143,6 +187,12 @@ func OnKey(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw
 		if action == glfw.Press {
 			user.freeMovement = !user.freeMovement
 		}
+	case glfw.KeySpace:
+		if action == glfw.Press && !user.freeMovement && user.yPos == m.Floor(user.yPos) {
+			user.fall = jumpSpeed
+		}
+	case glfw.KeyP:
+		fmt.Printf("%v%v\n", "Player ", user)
 	}
 
 }

@@ -123,7 +123,6 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	Terrain.InitGCubes()
 	Graphics.InitSkybox()
-	Terrain.PrintCubePos()
 
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)

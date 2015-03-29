@@ -93,6 +93,15 @@ func FindNearestCubes(xPos, yPos, zPos float64) []Cube {
 	return nearCubes
 }
 
+func IsInCube(xPos, yPos, zPos float64) bool {
+	for _, cube := range cubes {
+		if cube.XPos == xPos && cube.YPos == yPos && cube.ZPos == zPos {
+			return true
+		}
+	}
+	return false
+}
+
 func RenderLevel(vertAttrib, texCoordAttrib uint32, translateUniform int32) {
 
 	for _, cube := range cubes {
