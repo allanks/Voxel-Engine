@@ -6,8 +6,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/allanks/third-game/src/Player"
-
 	"gopkg.in/mgo.v2"
 )
 
@@ -18,15 +16,6 @@ const (
 var (
 	cubes []*Cube
 )
-
-func CheckPlayerCollisions() {
-	for _, cube := range cubes {
-		x, y, z := Player.GetPosition()
-		Player.SetPosistion(cube.CheckCollision(x, y, z, Player.GetPlayerSpeed()))
-		xPos, yPos, zPos := cube.CheckCollision(x, y-Player.Height, z, Player.GetPlayerSpeed())
-		Player.SetPosistion(xPos, yPos+Player.Height, zPos)
-	}
-}
 
 func GenLevel(xPos, yPos, zPos int32) {
 
@@ -90,6 +79,18 @@ func genRow(yPos, zPos, size int32, cubeType float64, mongoSession *mgo.Session)
 			log.Printf("RunQuery : ERROR : %s\n", err)
 		}
 	}
+}
+
+func FindNearestCubes(xPos, yPos, zPos float64) []Cube {
+	var nearCubes = []Cube{}
+	for _, cube := range cubes {
+		if (cube.XPos == xPos || cube.XPos == (xPos+1) || cube.XPos == (xPos-1)) &&
+			(cube.YPos == yPos || cube.YPos == (yPos+1) || cube.YPos == (yPos-1)) &&
+			(cube.ZPos == zPos || cube.ZPos == (zPos+1) || cube.ZPos == (zPos-1)) {
+			nearCubes = append(nearCubes, *cube)
+		}
+	}
+	return nearCubes
 }
 
 func RenderLevel(vertAttrib, texCoordAttrib uint32, translateUniform int32) {

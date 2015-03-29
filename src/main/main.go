@@ -143,7 +143,6 @@ func initOpenGLProgram(window *glfw.Window) {
 		Terrain.RenderLevel(vertAttrib, texCoordAttrib, translateUniform)
 
 		Player.MovePlayer(window)
-		Terrain.CheckPlayerCollisions()
 
 		window.SwapBuffers()
 		glfw.PollEvents()
