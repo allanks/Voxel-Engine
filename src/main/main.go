@@ -136,12 +136,14 @@ func initOpenGLProgram(window *glfw.Window) {
 		camera := Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 
-		Terrain.CheckPlayerCollisions()
 		x, y, z := Player.GetPosition()
 		gl.Uniform4f(translateUniform, float32(x), float32(y), float32(z), 0.0)
 		Graphics.RenderSkybox(vertAttrib, texCoordAttrib, translateUniform)
 
 		Terrain.RenderLevel(vertAttrib, texCoordAttrib, translateUniform)
+
+		Player.MovePlayer(window)
+		Terrain.CheckPlayerCollisions()
 
 		window.SwapBuffers()
 		glfw.PollEvents()
