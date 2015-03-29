@@ -14,7 +14,7 @@ var (
 )
 
 const (
-	forward, backwards, turnSpeed, moveSpeed, stop float64 = 1, -1, 0.5, 0.1, 0
+	forward, backwards, turnSpeed, moveSpeed, stop, Height float64 = 1, -1, 0.5, 0.1, 0, 1
 )
 
 type player struct {
@@ -24,7 +24,7 @@ type player struct {
 type moveFunc func(float64)
 
 func GenPlayer() {
-	user = player{0.0, 0.0, 0.0, -180.0, 0.0}
+	user = player{0.0, 1.0 + Height, 0.0, -180.0, 0.0}
 	movingForward = make(chan float64)
 	movingBackward = make(chan float64)
 	strafingLeft = make(chan float64)

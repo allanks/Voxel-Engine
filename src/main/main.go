@@ -121,7 +121,7 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
-	Terrain.InitCube()
+	Terrain.InitGCubes()
 	Graphics.InitSkybox()
 	Terrain.PrintCubePos()
 
