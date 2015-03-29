@@ -3,6 +3,7 @@ package Terrain
 import (
 	"fmt"
 	"log"
+	m "math"
 	"os"
 	"sync"
 
@@ -93,9 +94,11 @@ func FindNearestCubes(xPos, yPos, zPos float64) []Cube {
 	return nearCubes
 }
 
-func IsInCube(xPos, yPos, zPos float64) bool {
+func IsInCube(xPos, yPos, zPos, collisionDistance float64) bool {
 	for _, cube := range cubes {
-		if cube.XPos == xPos && cube.YPos == yPos && cube.ZPos == zPos {
+		if (cube.XPos == m.Floor(xPos) || cube.XPos == m.Floor(xPos+collisionDistance) || cube.XPos == m.Floor(xPos-collisionDistance)) &&
+			(cube.ZPos == m.Floor(zPos) || cube.ZPos == m.Floor(zPos+collisionDistance) || cube.ZPos == m.Floor(zPos-collisionDistance)) &&
+			cube.YPos == m.Floor(yPos) {
 			return true
 		}
 	}

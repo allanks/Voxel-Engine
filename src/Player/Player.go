@@ -23,7 +23,8 @@ const (
 	Height,
 	terminalVelocity,
 	jumpSpeed,
-	gravity float64 = 1, -1, 0.5, 0.1, 0, 1, -10, 2, 9.8
+	gravity,
+	collisionDistance float64 = 1, -1, 0.5, 0.1, 0, 1, -10, 2, 9.8, 0.15
 )
 
 type player struct {
@@ -59,11 +60,15 @@ func MovePlayer(window *glfw.Window) {
 	}
 	switch {
 	case window.GetKey(glfw.KeySpace) == glfw.Press && user.freeMovement:
-		user.yPos = user.yPos + (1 * moveSpeed)
+		if !Terrain.IsInCube(user.xPos, user.yPos+(moveSpeed)-1, user.zPos, collisionDistance) {
+			user.yPos = user.yPos + (moveSpeed)
+		}
 	case window.GetKey(glfw.KeyLeftShift) == glfw.Press && user.freeMovement:
-		user.yPos = user.yPos + (-1 * moveSpeed)
+		if !Terrain.IsInCube(user.xPos, user.yPos+(-1*moveSpeed)-1, user.zPos, collisionDistance) {
+			user.yPos = user.yPos + (-1 * moveSpeed)
+		}
 	case !user.freeMovement:
-		if Terrain.IsInCube(m.Floor(user.xPos), m.Floor(user.yPos+(user.fall*moveSpeed))-1, m.Floor(user.zPos)) {
+		if Terrain.IsInCube(user.xPos, user.yPos+(user.fall*moveSpeed)-1, user.zPos, collisionDistance) {
 			user.isFalling = false
 			user.fall = 0.0
 			user.yPos = m.Floor(user.yPos)
@@ -75,23 +80,6 @@ func MovePlayer(window *glfw.Window) {
 			if user.fall > terminalVelocity {
 				user.fall = user.fall - (gravity * frameRate)
 			}
-		}
-	}
-	if Terrain.IsInCube(user.xPos, user.yPos-1, user.zPos) {
-		fmt.Printf("%v%v\n", "Serious error occured, fixing", user)
-		selectEdge := func(a float64) float64 {
-			if a < 0.5 {
-				return m.Floor(a)
-			} else {
-				return m.Floor(a + 1)
-			}
-		}
-		if (m.Abs(user.xPos-0.5) > m.Abs(user.yPos-0.5)) && (m.Abs(user.xPos-0.5) > m.Abs(user.zPos-0.5)) {
-			user.xPos = selectEdge(user.xPos)
-		} else if m.Abs(user.yPos-0.5) > m.Abs(user.zPos-0.5) {
-			user.yPos = selectEdge(user.yPos)
-		} else {
-			user.zPos = selectEdge(user.zPos)
 		}
 	}
 }
@@ -127,16 +115,23 @@ func move(direction float64, bottomCubes, topCubes []Terrain.Cube) {
 	newX := user.xPos - (direction * xLook * moveSpeed)
 	newY := user.yPos + (direction * yLook * moveSpeed)
 	newZ := user.zPos - (direction * zLook * moveSpeed)
-	if CheckPlayerCollisions(newX, user.yPos+Height, user.zPos, topCubes) &&
-		CheckPlayerCollisions(newX, user.yPos, user.zPos, bottomCubes) {
+	if CheckPlayerCollisions(newX+collisionDistance, user.yPos+Height, user.zPos, topCubes) &&
+		CheckPlayerCollisions(newX+collisionDistance, user.yPos, user.zPos, bottomCubes) &&
+		CheckPlayerCollisions(newX-collisionDistance, user.yPos+Height, user.zPos, topCubes) &&
+		CheckPlayerCollisions(newX-collisionDistance, user.yPos, user.zPos, bottomCubes) {
 		user.xPos = newX
 	}
-	if user.freeMovement && CheckPlayerCollisions(user.xPos, newY+Height, user.zPos, topCubes) &&
-		CheckPlayerCollisions(user.xPos, newY, user.zPos, bottomCubes) {
+	if user.freeMovement &&
+		CheckPlayerCollisions(user.xPos, newY+Height+collisionDistance, user.zPos, topCubes) &&
+		CheckPlayerCollisions(user.xPos, newY+collisionDistance, user.zPos, bottomCubes) &&
+		CheckPlayerCollisions(user.xPos, newY+Height-collisionDistance, user.zPos, topCubes) &&
+		CheckPlayerCollisions(user.xPos, newY-collisionDistance, user.zPos, bottomCubes) {
 		user.yPos = newY
 	}
-	if CheckPlayerCollisions(user.xPos, user.yPos+Height, newZ, topCubes) &&
-		CheckPlayerCollisions(user.xPos, user.yPos, newZ, bottomCubes) {
+	if CheckPlayerCollisions(user.xPos, user.yPos+Height, newZ+collisionDistance, topCubes) &&
+		CheckPlayerCollisions(user.xPos, user.yPos, newZ+collisionDistance, bottomCubes) &&
+		CheckPlayerCollisions(user.xPos, user.yPos+Height, newZ-collisionDistance, topCubes) &&
+		CheckPlayerCollisions(user.xPos, user.yPos, newZ-collisionDistance, bottomCubes) {
 		user.zPos = newZ
 	}
 }
@@ -147,19 +142,23 @@ func strafe(direction float64, bottomCubes, topCubes []Terrain.Cube) {
 	newX := user.xPos + (-1 * direction * zLook * moveSpeed)
 	newZ := user.zPos + (direction * xLook * moveSpeed)
 
-	if CheckPlayerCollisions(newX, user.yPos+Height, user.zPos, topCubes) &&
-		CheckPlayerCollisions(newX, user.yPos, user.zPos, bottomCubes) {
+	if CheckPlayerCollisions(newX+collisionDistance, user.yPos+Height, user.zPos, topCubes) &&
+		CheckPlayerCollisions(newX+collisionDistance, user.yPos, user.zPos, bottomCubes) &&
+		CheckPlayerCollisions(newX-collisionDistance, user.yPos+Height, user.zPos, topCubes) &&
+		CheckPlayerCollisions(newX-collisionDistance, user.yPos, user.zPos, bottomCubes) {
 		user.xPos = newX
 	}
-	if CheckPlayerCollisions(user.xPos, user.yPos+Height, newZ, topCubes) &&
-		CheckPlayerCollisions(user.xPos, user.yPos, newZ, bottomCubes) {
+	if CheckPlayerCollisions(user.xPos, user.yPos+Height, newZ+collisionDistance, topCubes) &&
+		CheckPlayerCollisions(user.xPos, user.yPos, newZ+collisionDistance, bottomCubes) &&
+		CheckPlayerCollisions(user.xPos, user.yPos+Height, newZ-collisionDistance, topCubes) &&
+		CheckPlayerCollisions(user.xPos, user.yPos, newZ-collisionDistance, bottomCubes) {
 		user.zPos = newZ
 	}
 }
 
 func CheckPlayerCollisions(x, y, z float64, cubes []Terrain.Cube) bool {
 	for _, cube := range cubes {
-		if cube.CheckCollision(x, y, z, GetPlayerSpeed()) {
+		if cube.CheckCollision(m.Floor(x), m.Floor(y-1), m.Floor(z), GetPlayerSpeed()) {
 			return false
 		}
 	}

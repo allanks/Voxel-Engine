@@ -46,12 +46,9 @@ func (cube *Cube) PrintCollision(xPos, yPos, zPos float64) {
 
 func (cube *Cube) CheckCollision(xPos, yPos, zPos, moveSpeed float64) bool {
 
-	easyCompare := func(a, b float64) bool {
-		return a-b <= 1+(collisionDistance+moveSpeed) && a-b > 0-(collisionDistance+moveSpeed)
-	}
-	if easyCompare(xPos, cube.XPos) &&
-		easyCompare(yPos, cube.YPos) &&
-		easyCompare(zPos, cube.ZPos) {
+	if xPos == cube.XPos &&
+		yPos == cube.YPos &&
+		zPos == cube.ZPos {
 		return true
 	}
 	return false
