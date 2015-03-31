@@ -34,9 +34,9 @@ type player struct {
 
 type moveFunc func(float64)
 
-func GenPlayer() {
+func GenPlayer(xPos, yPos, zPos float64) {
 	lastFrameTime = glfw.GetTime()
-	user = player{0.0, 1.0, 0.0, -180.0, 0.0, 0.0, false, true}
+	user = player{xPos, yPos, zPos, -180.0, 0.0, 0.0, false, true}
 }
 
 func MovePlayer(window *glfw.Window) {

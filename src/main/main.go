@@ -95,8 +95,8 @@ func initOpenGLProgram(window *glfw.Window) {
 	}
 	gl.UseProgram(program)
 
-	Terrain.GenLevel(0, -5, 0)
-	Player.GenPlayer()
+	Terrain.GenLevel()
+	Player.GenPlayer(5, 34, 5)
 
 	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 100.0)
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
@@ -110,14 +110,8 @@ func initOpenGLProgram(window *glfw.Window) {
 	rotateUniform := gl.GetUniformLocation(program, gl.Str("rotate\x00"))
 	gl.UniformMatrix4fv(rotateUniform, 1, false, &rotate[0])
 
-	translateUniform := gl.GetUniformLocation(program, gl.Str("translate\x00"))
-	gl.Uniform4f(translateUniform, 0.0, 0.0, 0.0, 0.0)
-
 	textureUniform := gl.GetUniformLocation(program, gl.Str("tex\x00"))
 	gl.Uniform1i(textureUniform, 0)
-
-	vertAttrib := uint32(gl.GetAttribLocation(program, gl.Str("vert\x00")))
-	texCoordAttrib := uint32(gl.GetAttribLocation(program, gl.Str("vertTexCoord\x00")))
 
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
@@ -135,11 +129,11 @@ func initOpenGLProgram(window *glfw.Window) {
 		camera := Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 
-		x, y, z := Player.GetPosition()
-		gl.Uniform4f(translateUniform, float32(x), float32(y), float32(z), 0.0)
-		Graphics.RenderSkybox(vertAttrib, texCoordAttrib, translateUniform)
+		//x, y, z := Player.GetPosition()
+		//gl.Uniform4f(translateUniform, float32(x), float32(y), float32(z), 0.0)
+		Graphics.RenderSkybox(Player.GetPosition())
 
-		Terrain.RenderLevel(vertAttrib, texCoordAttrib, translateUniform)
+		Terrain.RenderLevel()
 
 		Player.MovePlayer(window)
 
@@ -164,16 +158,16 @@ var vertexShader string = `
 uniform mat4 projection;
 uniform mat4 camera;
 uniform mat4 rotate;
-uniform vec4 translate;
 
-in vec3 vert;
-in vec2 vertTexCoord;
+layout(location=0) in vec3 vert; // cube vertex position
+layout(location=1) in vec2 vertTexCoord; // cube texture coordinates
+layout(location=2) in vec3 pos; // instance data, unique to each object (instance)
 
 out vec2 fragTexCoord;
 
 void main() {
     fragTexCoord = vertTexCoord;
-    gl_Position = projection * camera * rotate * (vec4(vert, 1) + translate);
+    gl_Position = projection * camera * rotate * (vec4( vert + pos , 1));
 }
 ` + "\x00"
 

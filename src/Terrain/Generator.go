@@ -1,24 +1,41 @@
 package Terrain
 
 import (
-	"fmt"
 	"log"
 	m "math"
 	"os"
 	"sync"
 
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 const (
-	mongodb string = "localhost:27017"
+	mongodb   string = "localhost:27017"
+	chunkSize int    = 32
+	seaLevel  int    = 30
 )
 
 var (
-	cubes []*Cube
+	gameMap level
 )
 
-func GenLevel(xPos, yPos, zPos int32) {
+type level struct {
+	chunks []*chunk
+}
+
+type chunk struct {
+	ID         bson.ObjectId `bson:"_id,omitempty"`
+	XPos, ZPos int
+	layers     [128]*layer
+}
+
+type layer struct {
+	cubes []Cube
+	yPos  int
+}
+
+func GenLevel() {
 
 	f, err := os.OpenFile("LevelGen.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -42,78 +59,121 @@ func GenLevel(xPos, yPos, zPos int32) {
 	}
 	if count == 0 {
 		var waitGroup sync.WaitGroup
-		waitGroup.Add(7)
-		go genLayer(0, -1, 0, 5, Grass, &waitGroup, mongoSession)
-		go genLayer(0, -2, 0, 6, Grass, &waitGroup, mongoSession)
-		go genLayer(0, -3, 0, 7, Grass, &waitGroup, mongoSession)
-		go genLayer(0, -4, 0, 8, Grass, &waitGroup, mongoSession)
-		go genLayer(0, -5, 0, 7, Grass, &waitGroup, mongoSession)
-		go genLayer(0, -6, 0, 6, Grass, &waitGroup, mongoSession)
-		go genLayer(0, -7, 0, 5, Grass, &waitGroup, mongoSession)
+		waitGroup.Add(1)
+		go genChunk(0, 0, &waitGroup, mongoSession)
+		/*go genChunk(1, 0, &waitGroup, mongoSession)
+		go genChunk(0, 1, &waitGroup, mongoSession)
+		go genChunk(-1, 0, &waitGroup, mongoSession)
+		go genChunk(0, -1, &waitGroup, mongoSession)*/
 		waitGroup.Wait()
+		mongoSession.Fsync(false)
 	}
 
-	err = collection.Find(nil).All(&cubes)
+	loadGameMap(mongoSession)
+}
+
+func loadGameMap(mongoSession *mgo.Session) {
+	session := mongoSession.Copy()
+	defer session.Close()
+	collection := session.DB("GameDatabase").C("Chunks")
+	err := collection.Find(nil).All(&gameMap.chunks)
 	if err != nil {
 		log.Printf("RunQuery : ERROR : %s\n", err)
-		return
+	}
+	for j, c := range gameMap.chunks {
+		var waitGroup sync.WaitGroup
+		waitGroup.Add(len(c.layers))
+		for i := range c.layers {
+			c.layers[i] = &layer{yPos: i + 1}
+
+			go loadLayer(&waitGroup, c.layers[i], mongoSession)
+		}
+		waitGroup.Wait()
+		gameMap.chunks[j] = c
 	}
 
 }
 
-func genLayer(xPos, yPos, zPos, size int32, cubeType float64, waitGroup *sync.WaitGroup, mongoSession *mgo.Session) {
+func loadLayer(waitGroup *sync.WaitGroup, l *layer, mongoSession *mgo.Session) {
 	defer waitGroup.Done()
-	for i := -size; i < size; i++ {
-		go genRow(yPos, i, size, cubeType, mongoSession)
-	}
-}
-
-func genRow(yPos, zPos, size int32, cubeType float64, mongoSession *mgo.Session) {
 	session := mongoSession.Copy()
 	defer session.Close()
 	collection := session.DB("GameDatabase").C("Cubes")
+	collection.Find(bson.M{"ypos": l.yPos}).All(&l.cubes)
+}
 
-	for i := -size; i < size; i++ {
-		log.Printf("Creating Cube %v\n", &Cube{XPos: float64(i), YPos: float64(yPos), ZPos: float64(zPos), CubeType: cubeType})
-		err := collection.Insert(&Cube{XPos: float64(i), YPos: float64(yPos), ZPos: float64(zPos), CubeType: cubeType})
-		if err != nil {
-			log.Printf("RunQuery : ERROR : %s\n", err)
+func genChunk(x, z int, waitGroup *sync.WaitGroup, mongoSession *mgo.Session) {
+	defer waitGroup.Done()
+	session := mongoSession.Copy()
+	defer session.Close()
+	collection := session.DB("GameDatabase").C("Chunks")
+	c := &chunk{XPos: x, ZPos: z}
+	err := collection.Insert(c)
+	mongoSession.Fsync(false)
+	collection.Find(c).One(c)
+	if err != nil {
+		log.Printf("RunQuery : ERROR : %s\n", err)
+	}
+	for i := range c.layers {
+		if i < seaLevel {
+			go genLayer(c.XPos, i+1, c.ZPos, mongoSession)
+		}
+	}
+}
+
+func genLayer(xPos, yPos, zPos int, mongoSession *mgo.Session) {
+	session := mongoSession.Copy()
+	defer session.Close()
+	collection := session.DB("GameDatabase").C("Cubes")
+	var cubeType int
+	if (yPos + 1) >= seaLevel {
+		cubeType = Grass
+	} else if (yPos + 5) >= seaLevel {
+		cubeType = Dirt
+	} else if (yPos + 10) >= seaLevel {
+		cubeType = Gravel
+	} else {
+		cubeType = Stone
+	}
+	for x := 0; x < chunkSize; x++ {
+		for z := 0; z < chunkSize; z++ {
+			err := collection.Insert(&Cube{XPos: float64((xPos * chunkSize) + x), YPos: float64(yPos), ZPos: float64((zPos * chunkSize) + z), CubeType: cubeType})
+			if err != nil {
+				log.Printf("RunQuery : ERROR : %s\n", err)
+			}
 		}
 	}
 }
 
 func FindNearestCubes(xPos, yPos, zPos float64) []Cube {
 	var nearCubes = []Cube{}
-	for _, cube := range cubes {
-		if (cube.XPos == xPos || cube.XPos == (xPos+1) || cube.XPos == (xPos-1)) &&
-			(cube.YPos == yPos || cube.YPos == (yPos+1) || cube.YPos == (yPos-1)) &&
-			(cube.ZPos == zPos || cube.ZPos == (zPos+1) || cube.ZPos == (zPos-1)) {
-			nearCubes = append(nearCubes, *cube)
+	for _, c := range gameMap.chunks {
+		for _, l := range c.layers {
+			if float64(l.yPos) == yPos || float64(l.yPos) == (yPos+1) || float64(l.yPos) == (yPos-1) {
+				for _, cube := range l.cubes {
+					if (cube.XPos == xPos || cube.XPos == (xPos+1) || cube.XPos == (xPos-1)) &&
+						(cube.ZPos == zPos || cube.ZPos == (zPos+1) || cube.ZPos == (zPos-1)) {
+						nearCubes = append(nearCubes, cube)
+					}
+				}
+			}
 		}
 	}
 	return nearCubes
 }
 
 func IsInCube(xPos, yPos, zPos, collisionDistance float64) bool {
-	for _, cube := range cubes {
-		if (cube.XPos == m.Floor(xPos) || cube.XPos == m.Floor(xPos+collisionDistance) || cube.XPos == m.Floor(xPos-collisionDistance)) &&
-			(cube.ZPos == m.Floor(zPos) || cube.ZPos == m.Floor(zPos+collisionDistance) || cube.ZPos == m.Floor(zPos-collisionDistance)) &&
-			cube.YPos == m.Floor(yPos) {
-			return true
+	for _, c := range gameMap.chunks {
+		for _, l := range c.layers {
+			if float64(l.yPos) == m.Floor(yPos) {
+				for _, cube := range l.cubes {
+					if (cube.XPos == m.Floor(xPos) || cube.XPos == m.Floor(xPos+collisionDistance) || cube.XPos == m.Floor(xPos-collisionDistance)) &&
+						(cube.ZPos == m.Floor(zPos) || cube.ZPos == m.Floor(zPos+collisionDistance) || cube.ZPos == m.Floor(zPos-collisionDistance)) {
+						return true
+					}
+				}
+			}
 		}
 	}
 	return false
-}
-
-func RenderLevel(vertAttrib, texCoordAttrib uint32, translateUniform int32) {
-
-	for _, cube := range cubes {
-		Render(cube, vertAttrib, texCoordAttrib, translateUniform)
-	}
-}
-
-func PrintCubePos() {
-	for _, cube := range cubes {
-		fmt.Printf("%v\n", cube)
-	}
 }

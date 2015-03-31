@@ -16,6 +16,9 @@ const (
 	// Cube Types
 	Dirt = iota
 	Grass
+	Stone
+	CobbleStone
+	Gravel
 )
 
 type Cube struct {
@@ -23,10 +26,10 @@ type Cube struct {
 	XPos     float64
 	YPos     float64
 	ZPos     float64
-	CubeType float64
+	CubeType int
 }
 
-func (cube *Cube) GetCubeType() float64 {
+func (cube *Cube) GetCubeType() int {
 	return cube.CubeType
 }
 
@@ -57,11 +60,22 @@ func (cube *Cube) CheckCollision(xPos, yPos, zPos, moveSpeed float64) bool {
 var gCubes = []GCube{
 	GCube{},
 	GCube{},
+	GCube{},
+	GCube{},
+	GCube{},
 }
 
+var (
+	vao, vertexBuffer, textureBuffer, positionBuffer uint32
+)
+
 func InitGCubes() {
-	gCubes[Dirt].initialiseCube(textureDir + "Dirt")
-	gCubes[Grass].initialiseCube(textureDir + "Grass")
+	initialiseCube()
+	gCubes[Dirt].initCubeTextures(textureDir + "Dirt")
+	gCubes[Grass].initCubeTextures(textureDir + "Grass")
+	gCubes[Stone].initCubeTextures(textureDir + "Stone")
+	gCubes[CobbleStone].initCubeTextures(textureDir + "CobbleStone")
+	gCubes[Gravel].initCubeTextures(textureDir + "Gravel")
 }
 
 type GCube struct {
@@ -70,19 +84,10 @@ type GCube struct {
 	frontTexture,
 	backTexture,
 	leftTexture,
-	rightTexture,
-	vertexArrayObject,
-	vertexBufferObject uint32
+	rightTexture uint32
 }
 
-func (cube *GCube) initialiseCube(dir string) {
-	gl.GenVertexArrays(1, &cube.vertexArrayObject)
-	gl.BindVertexArray(cube.vertexArrayObject)
-
-	gl.GenBuffers(1, &cube.vertexBufferObject)
-	gl.BindBuffer(gl.ARRAY_BUFFER, cube.vertexBufferObject)
-	gl.BufferData(gl.ARRAY_BUFFER, len(cubeVertices)*4, gl.Ptr(cubeVertices), gl.STATIC_DRAW)
-
+func (cube *GCube) initCubeTextures(dir string) {
 	fmt.Printf("%v\n", "Loading Textures from: "+dir)
 
 	// Load the textures
@@ -113,86 +118,128 @@ func (cube *GCube) initialiseCube(dir string) {
 	}
 }
 
-func (cube *GCube) RenderCube(vertAttrib, texCoordAttrib uint32, translateUniform int32) {
-	gl.EnableVertexAttribArray(vertAttrib)
-	gl.VertexAttribPointer(vertAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
+func initialiseCube() {
+	gl.GenVertexArrays(1, &vao)
+	gl.BindVertexArray(vao)
 
-	gl.EnableVertexAttribArray(texCoordAttrib)
-	gl.VertexAttribPointer(texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
+	gl.GenBuffers(1, &vertexBuffer)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, len(cubeVertices)*4, gl.Ptr(cubeVertices), gl.STATIC_DRAW)
+	gl.EnableVertexAttribArray(0)
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
 
-	gl.BindVertexArray(cube.vertexArrayObject)
-	gl.BindBuffer(gl.ARRAY_BUFFER, cube.vertexBufferObject)
+	gl.GenBuffers(1, &textureBuffer)
+	gl.BindBuffer(gl.ARRAY_BUFFER, textureBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, len(cubeTexCoords)*4, gl.Ptr(cubeTexCoords), gl.STATIC_DRAW)
+	gl.EnableVertexAttribArray(1)
+	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 0, gl.PtrOffset(0))
 
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, cube.frontTexture)
-
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
-
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, cube.backTexture)
-
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 4, 4)
-
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, cube.leftTexture)
-
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 8, 4)
-
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, cube.rightTexture)
-
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 12, 4)
-
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, cube.topTexture)
-
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 16, 4)
-
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, cube.bottomTexture)
-
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 20, 4)
+	gl.GenBuffers(1, &positionBuffer)
+	gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+	gl.EnableVertexAttribArray(2)
+	gl.VertexAttribPointer(2, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
+	gl.VertexAttribDivisor(2, 1)
 }
 
-func Render(cube *Cube, vertAttrib, texCoordAttrib uint32, translateUniform int32) {
+func RenderLevel() {
 
-	xPos, yPos, zPos := cube.GetPos()
-	gl.Uniform4f(translateUniform, float32(xPos), float32(yPos), float32(zPos), 0.0)
-	gCube := gCubes[uint(cube.GetCubeType())]
-	gCube.RenderCube(vertAttrib, texCoordAttrib, translateUniform)
+	for i, gc := range gCubes {
+		gc.RenderCubes(i)
+	}
+}
 
+func (cube *GCube) RenderCubes(i int) {
+	var drawCubes = []Cube{}
+	for _, c := range gameMap.chunks {
+		for _, l := range c.layers {
+			for _, cube := range l.cubes {
+				if cube.CubeType == i {
+					drawCubes = append(drawCubes, cube)
+				}
+			}
+		}
+	}
+	if len(drawCubes) == 0 {
+		return
+	}
+	gl.BindVertexArray(vao)
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.BindTexture(gl.TEXTURE_2D, cube.topTexture)
+	position := []float32{}
+	for _, c := range drawCubes {
+		if c.XPos == 0 && c.YPos == 0 && c.ZPos == 0 {
+			fmt.Println("Zero Value")
+		}
+		position = append(position, float32(c.XPos), float32(c.YPos), float32(c.ZPos))
+	}
+	gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, len(position)*4, gl.Ptr(position), gl.STATIC_DRAW)
+	gl.DrawArraysInstanced(gl.TRIANGLE_STRIP, 0, 24, int32(len(position)))
 }
 
 var cubeVertices = []float32{
-	//  X, Y, Z, U, V
+	//  X, Y, Z,
 	// Front face
-	1.0, 1.0, 1.0, 0.0, 1.0,
-	1.0, 0.0, 1.0, 0.0, 0.0,
-	0.0, 1.0, 1.0, 1.0, 1.0,
-	0.0, 0.0, 1.0, 1.0, 0.0,
+	1.0, 1.0, 1.0,
+	1.0, 0.0, 1.0,
+	0.0, 1.0, 1.0,
+	0.0, 0.0, 1.0,
 	// Back face
-	0.0, 1.0, 0.0, 0.0, 1.0,
-	0.0, 0.0, 0.0, 0.0, 0.0,
-	1.0, 1.0, 0.0, 1.0, 1.0,
-	1.0, 0.0, 0.0, 1.0, 0.0,
+	0.0, 1.0, 0.0,
+	0.0, 0.0, 0.0,
+	1.0, 1.0, 0.0,
+	1.0, 0.0, 0.0,
 	// Left face
-	0.0, 1.0, 1.0, 0.0, 1.0,
-	0.0, 0.0, 1.0, 0.0, 0.0,
-	0.0, 1.0, 0.0, 1.0, 1.0,
-	0.0, 0.0, 0.0, 1.0, 0.0,
+	0.0, 1.0, 1.0,
+	0.0, 0.0, 1.0,
+	0.0, 1.0, 0.0,
+	0.0, 0.0, 0.0,
 	// Right face
-	1.0, 1.0, 0.0, 0.0, 1.0,
-	1.0, 0.0, 0.0, 0.0, 0.0,
-	1.0, 1.0, 1.0, 1.0, 1.0,
-	1.0, 0.0, 1.0, 1.0, 0.0,
+	1.0, 1.0, 0.0,
+	1.0, 0.0, 0.0,
+	1.0, 1.0, 1.0,
+	1.0, 0.0, 1.0,
 	// Top face
-	0.0, 1.0, 0.0, 0.0, 1.0,
-	1.0, 1.0, 0.0, 0.0, 0.0,
-	0.0, 1.0, 1.0, 1.0, 1.0,
-	1.0, 1.0, 1.0, 1.0, 0.0,
+	0.0, 1.0, 0.0,
+	1.0, 1.0, 0.0,
+	0.0, 1.0, 1.0,
+	1.0, 1.0, 1.0,
 	// Bottom face
-	1.0, 0.0, 0.0, 1.0, 0.0,
-	0.0, 0.0, 0.0, 1.0, 1.0,
-	1.0, 0.0, 1.0, 0.0, 0.0,
-	0.0, 0.0, 1.0, 0.0, 1.0,
+	1.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	1.0, 0.0, 1.0,
+	0.0, 0.0, 1.0,
+}
+
+var cubeTexCoords = []float32{
+	// Front face
+	1.0, 0.0,
+	1.0, 1.0,
+	0.0, 0.0,
+	0.0, 1.0,
+	// Back face
+	1.0, 0.0,
+	1.0, 1.0,
+	0.0, 0.0,
+	0.0, 1.0,
+	// Left face
+	1.0, 0.0,
+	1.0, 1.0,
+	0.0, 0.0,
+	0.0, 1.0,
+	// Right face
+	1.0, 0.0,
+	1.0, 1.0,
+	0.0, 0.0,
+	0.0, 1.0,
+	// Top face
+	1.0, 0.0,
+	1.0, 1.0,
+	0.0, 0.0,
+	0.0, 1.0,
+	// Bottom face
+	1.0, 0.0,
+	1.0, 1.0,
+	0.0, 0.0,
+	0.0, 1.0,
 }
