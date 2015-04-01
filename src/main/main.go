@@ -161,7 +161,7 @@ uniform mat4 rotate;
 layout(location=0) in vec3 vert; // cube vertex position
 layout(location=1) in vec2 vertTexCoord; // cube texture coordinates
 layout(location=2) in vec3 pos; // instance data, unique to each object (instance)
-layout(location=2) in vec3 color; // instance data, unique to each object (instance)
+layout(location=3) in vec3 color; // instance data, unique to each object (instance)
 
 //out vec2 fragTexCoord;
 out vec3 fragColor;
