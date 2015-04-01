@@ -1,6 +1,7 @@
 package Terrain
 
 import (
+	"fmt"
 	"log"
 	m "math"
 	"os"
@@ -27,12 +28,25 @@ type level struct {
 type chunk struct {
 	ID         bson.ObjectId `bson:"_id,omitempty"`
 	XPos, ZPos int
-	layers     [128]*layer
+	cubes      []Cube
+	instances  []float32
+	colors     []float32
 }
 
-type layer struct {
-	cubes []Cube
-	yPos  int
+func (c *chunk) getPositions() []float32 {
+	return c.instances
+}
+
+func (c *chunk) getColors() []float32 {
+	return c.colors
+}
+
+func (c *chunk) Update() {
+	for _, cube := range c.cubes {
+		c.instances = append(c.instances, float32(cube.XPos), float32(cube.YPos), float32(cube.ZPos))
+		gCube := gCubes[cube.CubeType]
+		c.colors = append(c.colors, gCube.getColors()...)
+	}
 }
 
 func GenLevel() {
@@ -80,26 +94,26 @@ func loadGameMap(mongoSession *mgo.Session) {
 	if err != nil {
 		log.Printf("RunQuery : ERROR : %s\n", err)
 	}
-	for j, c := range gameMap.chunks {
-		var waitGroup sync.WaitGroup
-		waitGroup.Add(len(c.layers))
-		for i := range c.layers {
-			c.layers[i] = &layer{yPos: i + 1}
-
-			go loadLayer(&waitGroup, c.layers[i], mongoSession)
-		}
-		waitGroup.Wait()
-		gameMap.chunks[j] = c
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(len(gameMap.chunks))
+	for _, c := range gameMap.chunks {
+		go loadChunk(&waitGroup, c, mongoSession)
+	}
+	waitGroup.Wait()
+	fmt.Printf("%v%v\n", "GameMap: ", gameMap)
+	for _, c := range gameMap.chunks {
+		fmt.Printf("%v%v\n", "Chunk: ", len(c.instances))
 	}
 
 }
 
-func loadLayer(waitGroup *sync.WaitGroup, l *layer, mongoSession *mgo.Session) {
+func loadChunk(waitGroup *sync.WaitGroup, c *chunk, mongoSession *mgo.Session) {
 	defer waitGroup.Done()
 	session := mongoSession.Copy()
 	defer session.Close()
 	collection := session.DB("GameDatabase").C("Cubes")
-	collection.Find(bson.M{"ypos": l.yPos}).All(&l.cubes)
+	collection.Find(bson.M{}).All(&c.cubes)
+	c.Update()
 }
 
 func genChunk(x, z int, waitGroup *sync.WaitGroup, mongoSession *mgo.Session) {
@@ -114,32 +128,30 @@ func genChunk(x, z int, waitGroup *sync.WaitGroup, mongoSession *mgo.Session) {
 	if err != nil {
 		log.Printf("RunQuery : ERROR : %s\n", err)
 	}
-	for i := range c.layers {
-		if i < seaLevel {
-			go genLayer(c.XPos, i+1, c.ZPos, mongoSession)
-		}
-	}
+	go genLayer(c.ID, c.XPos, c.ZPos, mongoSession)
 }
 
-func genLayer(xPos, yPos, zPos int, mongoSession *mgo.Session) {
+func genLayer(chunkID bson.ObjectId, xPos, zPos int, mongoSession *mgo.Session) {
 	session := mongoSession.Copy()
 	defer session.Close()
 	collection := session.DB("GameDatabase").C("Cubes")
 	var cubeType int
-	if (yPos + 1) >= seaLevel {
-		cubeType = Grass
-	} else if (yPos + 5) >= seaLevel {
-		cubeType = Dirt
-	} else if (yPos + 10) >= seaLevel {
-		cubeType = Gravel
-	} else {
-		cubeType = Stone
-	}
-	for x := 0; x < chunkSize; x++ {
-		for z := 0; z < chunkSize; z++ {
-			err := collection.Insert(&Cube{XPos: float64((xPos * chunkSize) + x), YPos: float64(yPos), ZPos: float64((zPos * chunkSize) + z), CubeType: cubeType})
-			if err != nil {
-				log.Printf("RunQuery : ERROR : %s\n", err)
+	for yPos := 0; yPos < seaLevel; yPos++ {
+		if (yPos + 1) >= seaLevel {
+			cubeType = Grass
+		} else if (yPos + 5) >= seaLevel {
+			cubeType = Dirt
+		} else if (yPos + 10) >= seaLevel {
+			cubeType = Gravel
+		} else {
+			cubeType = Stone
+		}
+		for x := 0; x < chunkSize; x++ {
+			for z := 0; z < chunkSize; z++ {
+				err := collection.Insert(&Cube{ChunkID: chunkID, XPos: float64(x), YPos: float64(yPos), ZPos: float64(z), CubeType: cubeType})
+				if err != nil {
+					log.Printf("RunQuery : ERROR : %s\n", err)
+				}
 			}
 		}
 	}
@@ -148,14 +160,15 @@ func genLayer(xPos, yPos, zPos int, mongoSession *mgo.Session) {
 func FindNearestCubes(xPos, yPos, zPos float64) []Cube {
 	var nearCubes = []Cube{}
 	for _, c := range gameMap.chunks {
-		for _, l := range c.layers {
-			if float64(l.yPos) == yPos || float64(l.yPos) == (yPos+1) || float64(l.yPos) == (yPos-1) {
-				for _, cube := range l.cubes {
-					if (cube.XPos == xPos || cube.XPos == (xPos+1) || cube.XPos == (xPos-1)) &&
-						(cube.ZPos == zPos || cube.ZPos == (zPos+1) || cube.ZPos == (zPos-1)) {
-						nearCubes = append(nearCubes, cube)
-					}
-				}
+		x := c.XPos * chunkSize
+		z := c.ZPos * chunkSize
+		for _, cube := range c.cubes {
+			cX := cube.XPos + float64(x)
+			cZ := cube.ZPos + float64(z)
+			if (cX == xPos || cX == (xPos+1) || cX == (xPos-1)) &&
+				(cube.YPos == yPos || cube.YPos == (yPos+1) || cube.YPos == (yPos-1)) &&
+				(cZ == zPos || cZ == (zPos+1) || cZ == (zPos-1)) {
+				nearCubes = append(nearCubes, cube)
 			}
 		}
 	}
@@ -164,14 +177,15 @@ func FindNearestCubes(xPos, yPos, zPos float64) []Cube {
 
 func IsInCube(xPos, yPos, zPos, collisionDistance float64) bool {
 	for _, c := range gameMap.chunks {
-		for _, l := range c.layers {
-			if float64(l.yPos) == m.Floor(yPos) {
-				for _, cube := range l.cubes {
-					if (cube.XPos == m.Floor(xPos) || cube.XPos == m.Floor(xPos+collisionDistance) || cube.XPos == m.Floor(xPos-collisionDistance)) &&
-						(cube.ZPos == m.Floor(zPos) || cube.ZPos == m.Floor(zPos+collisionDistance) || cube.ZPos == m.Floor(zPos-collisionDistance)) {
-						return true
-					}
-				}
+		x := c.XPos * chunkSize
+		z := c.ZPos * chunkSize
+		for _, cube := range c.cubes {
+			cX := cube.XPos + float64(x)
+			cZ := cube.ZPos + float64(z)
+			if (cX == m.Floor(xPos) || cX == m.Floor(xPos+collisionDistance) || cX == m.Floor(xPos-collisionDistance)) &&
+				(cZ == m.Floor(zPos) || cZ == m.Floor(zPos+collisionDistance) || cZ == m.Floor(zPos-collisionDistance)) &&
+				cube.YPos == m.Floor(yPos) {
+				return true
 			}
 		}
 	}

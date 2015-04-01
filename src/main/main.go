@@ -23,6 +23,8 @@ const WindowHeight = 600
 func init() {
 	// GLFW event handling must run on the main OS thread
 	runtime.LockOSThread()
+	// Have all the cpus
+	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
 func glDebugCallback(
@@ -95,6 +97,8 @@ func initOpenGLProgram(window *glfw.Window) {
 	}
 	gl.UseProgram(program)
 
+	Terrain.InitGCubes()
+
 	Terrain.GenLevel()
 	Player.GenPlayer(5, 34, 5)
 
@@ -110,12 +114,9 @@ func initOpenGLProgram(window *glfw.Window) {
 	rotateUniform := gl.GetUniformLocation(program, gl.Str("rotate\x00"))
 	gl.UniformMatrix4fv(rotateUniform, 1, false, &rotate[0])
 
-	textureUniform := gl.GetUniformLocation(program, gl.Str("tex\x00"))
-	gl.Uniform1i(textureUniform, 0)
-
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
-	Terrain.InitGCubes()
+	Terrain.InitialiseGCubeBuffers()
 	Graphics.InitSkybox()
 
 	gl.Enable(gl.DEPTH_TEST)
@@ -129,9 +130,7 @@ func initOpenGLProgram(window *glfw.Window) {
 		camera := Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 
-		//x, y, z := Player.GetPosition()
-		//gl.Uniform4f(translateUniform, float32(x), float32(y), float32(z), 0.0)
-		Graphics.RenderSkybox(Player.GetPosition())
+		//Graphics.RenderSkybox(Player.GetPosition())
 
 		Terrain.RenderLevel()
 
@@ -162,11 +161,14 @@ uniform mat4 rotate;
 layout(location=0) in vec3 vert; // cube vertex position
 layout(location=1) in vec2 vertTexCoord; // cube texture coordinates
 layout(location=2) in vec3 pos; // instance data, unique to each object (instance)
+layout(location=2) in vec3 color; // instance data, unique to each object (instance)
 
-out vec2 fragTexCoord;
+//out vec2 fragTexCoord;
+out vec3 fragColor;
 
 void main() {
-    fragTexCoord = vertTexCoord;
+    //fragTexCoord = vertTexCoord;
+    fragColor = color;
     gl_Position = projection * camera * rotate * (vec4( vert + pos , 1));
 }
 ` + "\x00"
@@ -176,11 +178,14 @@ var fragmentShader = `
 
 uniform sampler2D tex;
 
-in vec2 fragTexCoord;
+// in vec2 fragTexCoord;
+in vec3 fragColor;
 
-out vec4 outputColor;
+//out vec4 outputColor;
+out vec3 outputColor;
 
 void main() {
-    outputColor = texture(tex, fragTexCoord);
+    //outputColor = texture(tex, fragTexCoord);
+    outputColor = fragColor;
 }
 ` + "\x00"
