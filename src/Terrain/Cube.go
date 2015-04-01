@@ -66,47 +66,43 @@ var gCubes = []GCube{
 	GCube{},
 }
 
-var (
-	vao, vertexBuffer, textureBuffer uint32
-)
-
 var instances int32
 
 func InitGCubes() {
-	gCubes[Dirt].backColor = []float32{1.0, 1.0, 0.0}
-	gCubes[Dirt].frontColor = []float32{1.0, 1.0, 0.0}
-	gCubes[Dirt].leftColor = []float32{1.0, 1.0, 0.0}
-	gCubes[Dirt].rightColor = []float32{1.0, 1.0, 0.0}
-	gCubes[Dirt].topColor = []float32{1.0, 1.0, 0.0}
-	gCubes[Dirt].bottomColor = []float32{1.0, 1.0, 0.0}
+	// gCubes[Dirt].backColor = []float32{0.5, 0.25, 0.0}
+	// gCubes[Dirt].frontColor = []float32{0.5, 0.25, 0.0}
+	// gCubes[Dirt].leftColor = []float32{0.5, 0.25, 0.0}
+	// gCubes[Dirt].rightColor = []float32{0.5, 0.25, 0.0}
+	gCubes[Dirt].topColor = []float32{0.5, 0.25, 0.0}
+	// gCubes[Dirt].bottomColor = []float32{0.5, 0.25, 0.0}
 
-	gCubes[Grass].backColor = []float32{0.0, 0.0, 1.0}
-	gCubes[Grass].frontColor = []float32{0.0, 0.0, 1.0}
-	gCubes[Grass].leftColor = []float32{0.0, 0.0, 1.0}
-	gCubes[Grass].rightColor = []float32{0.0, 0.0, 1.0}
-	gCubes[Grass].topColor = []float32{0.0, 0.0, 1.0}
-	gCubes[Grass].bottomColor = []float32{0.0, 0.0, 1.0}
+	// gCubes[Grass].backColor = []float32{0.5, 0.25, 0.0}
+	// gCubes[Grass].frontColor = []float32{0.5, 0.25, 0.0}
+	// gCubes[Grass].leftColor = []float32{0.5, 0.25, 0.0}
+	// gCubes[Grass].rightColor = []float32{0.5, 0.25, 0.0}
+	gCubes[Grass].topColor = []float32{0.0, 1.0, 0.0}
+	// gCubes[Grass].bottomColor = []float32{0.5, 0.25, 0.0}
 
-	gCubes[Stone].backColor = []float32{1.0, 0.0, 1.0}
-	gCubes[Stone].frontColor = []float32{1.0, 0.0, 1.0}
-	gCubes[Stone].leftColor = []float32{1.0, 0.0, 1.0}
-	gCubes[Stone].rightColor = []float32{1.0, 0.0, 1.0}
-	gCubes[Stone].topColor = []float32{1.0, 0.0, 1.0}
-	gCubes[Stone].bottomColor = []float32{1.0, 0.0, 1.0}
+	// gCubes[Stone].backColor = []float32{0.5, 0.5, 0.5}
+	// gCubes[Stone].frontColor = []float32{0.5, 0.5, 0.5}
+	// gCubes[Stone].leftColor = []float32{0.5, 0.5, 0.5}
+	// gCubes[Stone].rightColor = []float32{0.5, 0.5, 0.5}
+	gCubes[Stone].topColor = []float32{0.5, 0.5, 0.5}
+	// gCubes[Stone].bottomColor = []float32{0.5, 0.5, 0.5}
 
-	gCubes[CobbleStone].backColor = []float32{1.0, 1.0, 1.0}
-	gCubes[CobbleStone].frontColor = []float32{1.0, 1.0, 1.0}
-	gCubes[CobbleStone].leftColor = []float32{1.0, 1.0, 1.0}
-	gCubes[CobbleStone].rightColor = []float32{1.0, 1.0, 1.0}
-	gCubes[CobbleStone].topColor = []float32{1.0, 1.0, 1.0}
-	gCubes[CobbleStone].bottomColor = []float32{1.0, 1.0, 1.0}
+	// gCubes[CobbleStone].backColor = []float32{0.25, 0.25, 0.25}
+	// gCubes[CobbleStone].frontColor = []float32{0.25, 0.25, 0.25}
+	// gCubes[CobbleStone].leftColor = []float32{0.25, 0.25, 0.25}
+	// gCubes[CobbleStone].rightColor = []float32{0.25, 0.25, 0.25}
+	gCubes[CobbleStone].topColor = []float32{0.25, 0.25, 0.25}
+	// gCubes[CobbleStone].bottomColor = []float32{0.25, 0.25, 0.25}
 
-	gCubes[Gravel].backColor = []float32{1.0, 0.0, 0.0}
-	gCubes[Gravel].frontColor = []float32{1.0, 0.0, 0.0}
-	gCubes[Gravel].leftColor = []float32{1.0, 0.0, 0.0}
-	gCubes[Gravel].rightColor = []float32{1.0, 0.0, 0.0}
-	gCubes[Gravel].topColor = []float32{1.0, 0.0, 0.0}
-	gCubes[Gravel].bottomColor = []float32{1.0, 0.0, 0.0}
+	// gCubes[Gravel].backColor = []float32{0.3, 0.0, 0.2}
+	// gCubes[Gravel].frontColor = []float32{0.3, 0.0, 0.2}
+	// gCubes[Gravel].leftColor = []float32{0.3, 0.0, 0.2}
+	// gCubes[Gravel].rightColor = []float32{0.3, 0.0, 0.2}
+	gCubes[Gravel].topColor = []float32{0.3, 0.0, 0.2}
+	// gCubes[Gravel].bottomColor = []float32{0.3, 0.0, 0.2}
 	/*gCubes[Dirt].initCubeTextures(textureDir + "Dirt")
 	gCubes[Grass].initCubeTextures(textureDir + "Grass")
 	gCubes[Stone].initCubeTextures(textureDir + "Stone")
@@ -131,12 +127,7 @@ type GCube struct {
 
 func (cube *GCube) getColors() []float32 {
 	colors := []float32{}
-	colors = append(colors, cube.frontColor...)
-	colors = append(colors, cube.backColor...)
-	colors = append(colors, cube.leftColor...)
-	colors = append(colors, cube.rightColor...)
 	colors = append(colors, cube.topColor...)
-	colors = append(colors, cube.bottomColor...)
 	return colors
 }
 
@@ -171,10 +162,15 @@ func (cube *GCube) initCubeTextures(dir string) {
 	}
 }
 
+var (
+	vao, positionBuffer, colorBuffer uint32
+)
+
 func InitialiseGCubeBuffers() {
 	gl.GenVertexArrays(1, &vao)
 	gl.BindVertexArray(vao)
 
+	var vertexBuffer, textureBuffer uint32
 	gl.GenBuffers(1, &vertexBuffer)
 	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, len(cubeVertices)*4, gl.Ptr(cubeVertices), gl.STATIC_DRAW)
@@ -187,32 +183,17 @@ func InitialiseGCubeBuffers() {
 	gl.EnableVertexAttribArray(1)
 	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 0, gl.PtrOffset(0))
 
-	positions, colors := []float32{}, []float32{}
-
-	for _, c := range gameMap.chunks {
-		positions = append(positions, c.getPositions()...)
-		colors = append(colors, c.getColors()...)
-	}
-
-	fmt.Printf("%v%v\n", "Position Buffer has entries ", len(positions))
-	fmt.Printf("%v%v\n", "Color Buffer has entries ", len(colors))
-
-	var positionBuffer, colorBuffer uint32
 	gl.GenBuffers(1, &positionBuffer)
 	gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
 	gl.EnableVertexAttribArray(2)
-	gl.BufferData(gl.ARRAY_BUFFER, len(positions)*4, gl.Ptr(positions), gl.STATIC_DRAW)
 	gl.VertexAttribPointer(2, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
-	gl.VertexAttribDivisor(2, 6)
+	gl.VertexAttribDivisor(2, 1)
 
 	gl.GenBuffers(1, &colorBuffer)
 	gl.BindBuffer(gl.ARRAY_BUFFER, colorBuffer)
 	gl.EnableVertexAttribArray(3)
-	gl.BufferData(gl.ARRAY_BUFFER, len(colors)*4, gl.Ptr(colors), gl.STATIC_DRAW)
 	gl.VertexAttribPointer(3, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
 	gl.VertexAttribDivisor(3, 1)
-
-	instances = int32(len(colors) / 3)
 }
 
 func RenderLevel() {
@@ -225,7 +206,20 @@ func RenderLevel() {
 func (cube *GCube) RenderCubes(i int) {
 
 	gl.BindVertexArray(vao)
-	gl.DrawArraysInstanced(gl.TRIANGLE_STRIP, 0, 24, int32(instances))
+
+	for _, c := range gameMap.chunks {
+		positions := c.getPositions()
+		colors := c.getColors()
+
+		gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+		gl.BufferData(gl.ARRAY_BUFFER, len(positions)*4, gl.Ptr(positions), gl.STATIC_DRAW)
+		gl.BindBuffer(gl.ARRAY_BUFFER, colorBuffer)
+		gl.BufferData(gl.ARRAY_BUFFER, len(colors)*4, gl.Ptr(colors), gl.STATIC_DRAW)
+
+		instances = int32(len(colors) / 3)
+		gl.DrawArraysInstanced(gl.TRIANGLE_STRIP, 0, 24, int32(instances))
+	}
+
 }
 
 var cubeVertices = []float32{

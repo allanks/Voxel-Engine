@@ -1,7 +1,6 @@
 package Terrain
 
 import (
-	"fmt"
 	"log"
 	m "math"
 	"os"
@@ -43,7 +42,7 @@ func (c *chunk) getColors() []float32 {
 
 func (c *chunk) Update() {
 	for _, cube := range c.cubes {
-		c.instances = append(c.instances, float32(cube.XPos), float32(cube.YPos), float32(cube.ZPos))
+		c.instances = append(c.instances, float32((float64(c.XPos*chunkSize))+cube.XPos), float32(cube.YPos), float32((float64(c.ZPos*chunkSize))+cube.ZPos))
 		gCube := gCubes[cube.CubeType]
 		c.colors = append(c.colors, gCube.getColors()...)
 	}
@@ -73,12 +72,12 @@ func GenLevel() {
 	}
 	if count == 0 {
 		var waitGroup sync.WaitGroup
-		waitGroup.Add(1)
+		waitGroup.Add(5)
 		go genChunk(0, 0, &waitGroup, mongoSession)
-		/*go genChunk(1, 0, &waitGroup, mongoSession)
+		go genChunk(1, 0, &waitGroup, mongoSession)
 		go genChunk(0, 1, &waitGroup, mongoSession)
 		go genChunk(-1, 0, &waitGroup, mongoSession)
-		go genChunk(0, -1, &waitGroup, mongoSession)*/
+		go genChunk(0, -1, &waitGroup, mongoSession)
 		waitGroup.Wait()
 		mongoSession.Fsync(false)
 	}
@@ -100,10 +99,6 @@ func loadGameMap(mongoSession *mgo.Session) {
 		go loadChunk(&waitGroup, c, mongoSession)
 	}
 	waitGroup.Wait()
-	fmt.Printf("%v%v\n", "GameMap: ", gameMap)
-	for _, c := range gameMap.chunks {
-		fmt.Printf("%v%v\n", "Chunk: ", len(c.instances))
-	}
 
 }
 
