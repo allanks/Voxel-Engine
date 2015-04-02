@@ -132,7 +132,7 @@ func initOpenGLProgram(window *glfw.Window) {
 
 		//Graphics.RenderSkybox(Player.GetPosition())
 
-		Terrain.RenderLevel()
+		Terrain.RenderCubes()
 
 		Player.MovePlayer(window)
 

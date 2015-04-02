@@ -182,14 +182,7 @@ func InitialiseGCubeBuffers() {
 	gl.VertexAttribDivisor(3, 1)
 }
 
-func RenderLevel() {
-
-	for i, gc := range gCubes {
-		gc.RenderCubes(i)
-	}
-}
-
-func (cube *GCube) RenderCubes(i int) {
+func RenderCubes() {
 
 	gl.BindVertexArray(vao)
 
