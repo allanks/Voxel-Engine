@@ -5,9 +5,9 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/allanks/third-game/src/Graphics"
-	"github.com/allanks/third-game/src/Player"
-	"github.com/allanks/third-game/src/Terrain"
+	"github.com/allanks/Voxel-Engine/src/Graphics"
+	"github.com/allanks/Voxel-Engine/src/Player"
+	"github.com/allanks/Voxel-Engine/src/Terrain"
 	"github.com/go-gl/glfw/v3.1/glfw"
 	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"github.com/go-gl/mathgl/mgl32"

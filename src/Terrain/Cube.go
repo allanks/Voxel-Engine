@@ -3,7 +3,7 @@ package Terrain
 import (
 	"fmt"
 
-	"github.com/allanks/third-game/src/Graphics"
+	"github.com/allanks/Voxel-Engine/src/Graphics"
 	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -23,10 +23,10 @@ const (
 
 type Cube struct {
 	ID       bson.ObjectId `bson:"_id,omitempty"`
-	ChunkID  bson.ObjectId `bson:"omitempty"`
-	XPos     float64
-	YPos     float64
-	ZPos     float64
+	ChunkID  bson.ObjectId
+	XPos     int
+	YPos     int
+	ZPos     int
 	CubeType int
 }
 
@@ -34,21 +34,7 @@ func (cube *Cube) GetCubeType() int {
 	return cube.CubeType
 }
 
-func (cube *Cube) GetPos() (float64, float64, float64) {
-	return cube.XPos, cube.YPos, cube.ZPos
-}
-
-func (cube *Cube) setPos(xPos, yPos, zPos float64) {
-	cube.XPos = xPos
-	cube.YPos = yPos
-	cube.ZPos = zPos
-}
-
-func (cube *Cube) PrintCollision(xPos, yPos, zPos float64) {
-	fmt.Printf("%v %v %v\n", xPos-cube.XPos, yPos-cube.YPos, zPos-cube.ZPos)
-}
-
-func (cube *Cube) CheckCollision(xPos, yPos, zPos, moveSpeed float64) bool {
+func (cube *Cube) CheckCollision(xPos, yPos, zPos int) bool {
 
 	if xPos == cube.XPos &&
 		yPos == cube.YPos &&
