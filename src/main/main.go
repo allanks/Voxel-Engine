@@ -185,6 +185,6 @@ in vec2 fragTexCoord;
 out vec4 outputColor;
 
 void main() {
-    outputColor = texture(tex, (fragTexCoord*0.125));
+    outputColor = texture(tex, (fragTexCoord*0.25));
 }
 ` + "\x00"

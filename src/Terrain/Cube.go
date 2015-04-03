@@ -149,6 +149,46 @@ var cubeVertices = []float32{
 }
 
 func InitGCubes() {
+	sky.texture = []float32{
+		// Front and back are swapped as we are view from inside the cube
+
+		// front
+		3, 0,
+		3, 1,
+		2, 0,
+		2, 1,
+
+		// back
+		4, 0,
+		4, 1,
+		3, 0,
+		3, 1,
+
+		// left
+		4, 1,
+		4, 2,
+		3, 1,
+		3, 2,
+
+		//right
+		1, 2,
+		1, 3,
+		0, 2,
+		0, 3,
+
+		// top
+		1, 3,
+		1, 4,
+		0, 3,
+		0, 4,
+
+		// bottom
+		3, 1,
+		3, 2,
+		2, 1,
+		2, 2,
+	}
+
 	GCubes[Dirt].Gtype = Dirt
 	GCubes[Grass].Gtype = Grass
 	GCubes[Stone].Gtype = Stone
@@ -309,42 +349,5 @@ func InitGCubes() {
 		2, 2,
 		1, 1,
 		1, 2,
-	}
-	sky.texture = []float32{
-		// front
-		4, 0,
-		4, 1,
-		3, 0,
-		3, 1,
-
-		// back
-		3, 0,
-		3, 1,
-		2, 0,
-		2, 1,
-
-		// left
-		4, 1,
-		4, 2,
-		3, 1,
-		3, 2,
-
-		//right
-		1, 2,
-		1, 3,
-		0, 2,
-		0, 3,
-
-		// top
-		1, 3,
-		1, 4,
-		0, 3,
-		0, 4,
-
-		// bottom
-		3, 1,
-		3, 2,
-		2, 1,
-		2, 2,
 	}
 }
