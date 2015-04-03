@@ -99,7 +99,6 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	Terrain.InitGCubes()
 
-	Terrain.GenLevel()
 	Player.GenPlayer(5, 34, 5)
 
 	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 100.0)
@@ -116,7 +115,7 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
-	Terrain.InitialiseGCubeBuffers()
+	vao, positionBuffer, colorBuffer := Terrain.InitialiseGCubeBuffers()
 	Graphics.InitSkybox()
 
 	gl.Enable(gl.DEPTH_TEST)
@@ -132,7 +131,7 @@ func initOpenGLProgram(window *glfw.Window) {
 
 		//Graphics.RenderSkybox(Player.GetPosition())
 
-		Terrain.RenderCubes()
+		Player.Render(vao, positionBuffer, colorBuffer)
 
 		Player.MovePlayer(window)
 

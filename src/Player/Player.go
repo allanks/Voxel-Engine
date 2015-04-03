@@ -2,16 +2,23 @@ package Player
 
 import (
 	"fmt"
+	"log"
 	m "math"
+	"os"
+	"time"
 
 	"github.com/allanks/Voxel-Engine/src/Terrain"
 	"github.com/go-gl/glfw/v3.1/glfw"
+	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"github.com/go-gl/mathgl/mgl32"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 var (
 	user          player
 	lastFrameTime float64
+	mongoSession  *mgo.Session
 )
 
 const (
@@ -25,18 +32,27 @@ const (
 	jumpSpeed,
 	gravity,
 	collisionDistance float64 = 1, -1, 0.5, 0.1, 0, 1, -10, 2, 9.8, 0.15
+	mongodb string = "localhost:27017"
 )
 
 type player struct {
 	xPos, yPos, zPos, pitch, turn, fall float64
 	freeMovement, isFalling             bool
+	gameMap                             level
+	logFile                             *os.File
+}
+
+type level struct {
+	chunks []*Chunk
 }
 
 type moveFunc func(float64)
 
 func GenPlayer(xPos, yPos, zPos float64) {
 	lastFrameTime = glfw.GetTime()
-	user = player{xPos, yPos, zPos, -180.0, 0.0, 0.0, false, true}
+	createDatabaseLink()
+	user = player{xPos, yPos, zPos, -180.0, 0.0, 0.0, false, true, level{}, &os.File{}}
+	user.loadGameMap(mongoSession)
 }
 
 func MovePlayer(window *glfw.Window) {
@@ -57,15 +73,15 @@ func MovePlayer(window *glfw.Window) {
 	}
 	switch {
 	case window.GetKey(glfw.KeySpace) == glfw.Press && user.freeMovement:
-		if !Terrain.IsInCube(user.xPos, user.yPos+(moveSpeed)-1, user.zPos, collisionDistance) {
+		if !user.gameMap.IsInCube(user.xPos, user.yPos+(moveSpeed)-1, user.zPos, collisionDistance) {
 			user.yPos = user.yPos + (moveSpeed)
 		}
 	case window.GetKey(glfw.KeyLeftShift) == glfw.Press && user.freeMovement:
-		if !Terrain.IsInCube(user.xPos, user.yPos+(-1*moveSpeed)-1, user.zPos, collisionDistance) {
+		if !user.gameMap.IsInCube(user.xPos, user.yPos+(-1*moveSpeed)-1, user.zPos, collisionDistance) {
 			user.yPos = user.yPos + (-1 * moveSpeed)
 		}
 	case !user.freeMovement:
-		if Terrain.IsInCube(user.xPos, user.yPos+(user.fall*moveSpeed)-1, user.zPos, collisionDistance) {
+		if user.gameMap.IsInCube(user.xPos, user.yPos+(user.fall*moveSpeed)-1, user.zPos, collisionDistance) {
 			user.isFalling = false
 			user.fall = 0.0
 			user.yPos = m.Floor(user.yPos)
@@ -112,17 +128,17 @@ func move(direction float64) {
 	newX := user.xPos - (direction * xLook * moveSpeed)
 	newY := user.yPos + (direction * yLook * moveSpeed)
 	newZ := user.zPos - (direction * zLook * moveSpeed)
-	if !Terrain.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
-		!Terrain.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
+	if !user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
+		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
 		user.xPos = newX
 	}
 	if user.freeMovement &&
-		!Terrain.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
-		!Terrain.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
+		!user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
+		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
 		user.yPos = newY
 	}
-	if !Terrain.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
-		!Terrain.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
+	if !user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
+		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
 		user.zPos = newZ
 	}
 }
@@ -133,23 +149,14 @@ func strafe(direction float64) {
 	newX := user.xPos + (-1 * direction * zLook * moveSpeed)
 	newZ := user.zPos + (direction * xLook * moveSpeed)
 
-	if !Terrain.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
-		!Terrain.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
+	if !user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
+		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
 		user.xPos = newX
 	}
-	if !Terrain.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
-		!Terrain.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
+	if !user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
+		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
 		user.zPos = newZ
 	}
-}
-
-func CheckPlayerCollisions(x, y, z float64, cubes []Terrain.Cube) bool {
-	for _, cube := range cubes {
-		if cube.CheckCollision(int(m.Floor(x)), int(m.Floor(y-1)), int(m.Floor(z))) {
-			return false
-		}
-	}
-	return true
 }
 
 func OnCursor(window *glfw.Window, xPos, yPos float64) {
@@ -179,6 +186,238 @@ func OnKey(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw
 		}
 	case glfw.KeyP:
 		fmt.Printf("%v%v\n", "Player ", user)
+	}
+}
+
+func (gameMap *level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool {
+	pX := int(m.Floor(xPos))
+	pY := int(m.Floor(yPos))
+	pZ := int(m.Floor(zPos))
+	pXpC := int(m.Floor(xPos + collisionDistance))
+	pXmC := int(m.Floor(xPos - collisionDistance))
+	pZpC := int(m.Floor(zPos + collisionDistance))
+	pZmC := int(m.Floor(zPos - collisionDistance))
+	for _, c := range gameMap.chunks {
+		if c == nil {
+			continue
+		}
+		if pX >= (c.XPos-1)*chunkSize && pX <= (c.XPos+1)*chunkSize && pZ >= (c.ZPos-1)*chunkSize && pZ <= (c.ZPos+1)*chunkSize {
+			x := c.XPos * chunkSize
+			z := c.ZPos * chunkSize
+			for i := 0; i < (len(c.instances) / 3); i++ {
+				cX := c.instances[i*3] + x
+				cY := c.instances[(i*3)+1]
+				cZ := c.instances[(i*3)+2] + z
+				if (cX == pX || cX == pXpC || cX == pXmC) &&
+					(cZ == pZ || cZ == pZpC || cZ == pZmC) &&
+					cY == pY {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (p *player) loadGameMap(mongoSession *mgo.Session) {
+	session := mongoSession.Copy()
+	defer session.Close()
+	collection := session.DB("GameDatabase").C("Chunks")
+	x := int(m.Floor(p.xPos / float64(chunkSize)))
+	z := int(m.Floor(p.zPos / float64(chunkSize)))
+	p.loadNewChunk(x, z, collection, mongoSession)
+	go p.loopChunkLoader(mongoSession)
+}
+
+func (p *player) loopChunkLoader(mongoSession *mgo.Session) {
+	session := mongoSession.Copy()
+	defer session.Close()
+	collection := session.DB("GameDatabase").C("Chunks")
+	for {
+		x := int(m.Floor(p.xPos / float64(chunkSize)))
+		z := int(m.Floor(p.zPos / float64(chunkSize)))
+		p.removeOldChunks(x, z)
+		if !checkForChunk(x, z, p.gameMap.chunks) {
+			p.loadNewChunk(x, z, collection, mongoSession)
+		}
+		if !checkForChunk(x+1, z, p.gameMap.chunks) {
+			p.loadNewChunk(x+1, z, collection, mongoSession)
+		}
+		if !checkForChunk(x-1, z, p.gameMap.chunks) {
+			p.loadNewChunk(x-1, z, collection, mongoSession)
+		}
+		if !checkForChunk(x, z+1, p.gameMap.chunks) {
+			p.loadNewChunk(x, z+1, collection, mongoSession)
+		}
+		if !checkForChunk(x, z-1, p.gameMap.chunks) {
+			p.loadNewChunk(x, z-1, collection, mongoSession)
+		}
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (p *player) removeOldChunks(x, z int) {
+	for i, ch := range p.gameMap.chunks {
+		if ch == nil {
+			continue
+		}
+		if ch.XPos == (x-2) || ch.ZPos == (z-2) || ch.XPos == (x+2) || ch.ZPos == (z+2) {
+			copy(p.gameMap.chunks[i:], p.gameMap.chunks[i+1:])
+			p.gameMap.chunks[len(p.gameMap.chunks)-1] = nil
+			p.gameMap.chunks = p.gameMap.chunks[:len(p.gameMap.chunks)-1]
+			p.removeOldChunks(x, z)
+			break
+		}
+	}
+}
+
+func (p *player) loadNewChunk(x, z int, collection *mgo.Collection, mongoSession *mgo.Session) {
+	ch := Chunk{}
+	err := collection.Find(bson.M{"xpos": x, "zpos": z}).One(&ch)
+	if err != nil {
+		fmt.Printf("Creating Chunk at X %v Z %v\n", x, z)
+		genChunk(x, z, mongoSession)
+		mongoSession.Fsync(false)
+		err = collection.Find(bson.M{"xpos": x, "zpos": z}).One(&ch)
+		if err != nil {
+			log.Fatalf("Could not create chunk: %s\n", err)
+		}
+	}
+	ch.loadChunk(mongoSession)
+	p.gameMap.chunks = append(p.gameMap.chunks, &ch)
+
+}
+
+func checkForChunk(x, z int, chunks []*Chunk) bool {
+	for _, ch := range chunks {
+		if ch == nil {
+			continue
+		}
+		if ch.XPos == x && ch.ZPos == z {
+			return true
+		}
+	}
+	return false
+}
+
+func createDatabaseLink() {
+	var err error
+	user.logFile, err = os.OpenFile("ErrorLog.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	log.SetOutput(user.logFile)
+	mongoSession, err = mgo.Dial(mongodb)
+	if err != nil {
+		log.Fatalf("CreateSession: %s\n", err)
+	}
+}
+func closeMongoSession() {
+	user.logFile.Close()
+	mongoSession.Close()
+}
+
+type Chunk struct {
+	ID         bson.ObjectId `bson:"_id,omitempty"`
+	XPos, ZPos int
+	instances  []int
+	colors     []float32
+}
+
+func (c *Chunk) getPositions() []float32 {
+	val := []float32{}
+	for i := 0; i < (len(c.instances) / 3); i++ {
+		val = append(val, float32((c.XPos*chunkSize)+c.instances[i*3]), float32(c.instances[(i*3)+1]), float32((c.ZPos*chunkSize)+c.instances[(i*3)+2]))
+	}
+	return val
+}
+
+func (c *Chunk) getColors() []float32 {
+	return c.colors
+}
+
+func (c *Chunk) Update(cubes []Terrain.Cube) {
+	for _, cube := range cubes {
+		c.instances = append(c.instances, cube.XPos, cube.YPos, cube.ZPos)
+		gCube := Terrain.GCubes[cube.CubeType]
+		c.colors = append(c.colors, gCube.GetColors()...)
+	}
+}
+
+func (c *Chunk) loadChunk(mongoSession *mgo.Session) {
+	session := mongoSession.Copy()
+	defer session.Close()
+	collection := session.DB("GameDatabase").C("Cubes")
+	cubes := []Terrain.Cube{}
+	collection.Find(bson.M{"chunkid": c.ID}).All(&cubes)
+	c.Update(cubes)
+}
+
+const (
+	chunkSize int = 64
+	seaLevel  int = 30
+)
+
+func genChunk(x, z int, mongoSession *mgo.Session) {
+	session := mongoSession.Copy()
+	defer session.Close()
+	collection := session.DB("GameDatabase").C("Chunks")
+	c := &Chunk{XPos: x, ZPos: z}
+	err := collection.Insert(c)
+	mongoSession.Fsync(false)
+	collection.Find(c).One(c)
+	if err != nil {
+		log.Printf("RunQuery : ERROR : %s\n", err)
+	}
+	collection = session.DB("GameDatabase").C("Cubes")
+	var cubeType int
+	for yPos := 0; yPos < seaLevel; yPos++ {
+		if (yPos + 1) >= seaLevel {
+			cubeType = Terrain.Grass
+		} else if (yPos + 5) >= seaLevel {
+			cubeType = Terrain.Dirt
+		} else if (yPos + 10) >= seaLevel {
+			cubeType = Terrain.Gravel
+		} else {
+			cubeType = Terrain.Stone
+		}
+		for x := 0; x < chunkSize; x++ {
+			for z := 0; z < chunkSize; z++ {
+				err := collection.Insert(&Terrain.Cube{ChunkID: c.ID, XPos: x, YPos: yPos, ZPos: z, CubeType: cubeType})
+				if err != nil {
+					log.Printf("RunQuery : ERROR : %s\n", err)
+				}
+			}
+		}
+	}
+}
+
+func Render(vao, positionBuffer, colorBuffer uint32) {
+	user.gameMap.RenderLevel(vao, positionBuffer, colorBuffer)
+}
+
+func (gameMap *level) RenderLevel(vao, positionBuffer, colorBuffer uint32) {
+
+	gl.BindVertexArray(vao)
+
+	for _, c := range gameMap.chunks {
+		if c == nil {
+			continue
+		}
+		positions := c.getPositions()
+		colors := c.getColors()
+
+		if len(positions) == 0 || len(colors) == 0 {
+			continue
+		}
+
+		gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+		gl.BufferData(gl.ARRAY_BUFFER, len(positions)*4, gl.Ptr(positions), gl.STATIC_DRAW)
+		gl.BindBuffer(gl.ARRAY_BUFFER, colorBuffer)
+		gl.BufferData(gl.ARRAY_BUFFER, len(colors)*4, gl.Ptr(colors), gl.STATIC_DRAW)
+
+		instances := int32(len(colors) / 3)
+		gl.DrawArraysInstanced(gl.TRIANGLE_STRIP, 0, 24, int32(instances))
 	}
 
 }
