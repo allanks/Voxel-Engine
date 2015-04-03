@@ -135,8 +135,8 @@ func initOpenGLProgram(window *glfw.Window) {
 
 		camera := Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
-
-		Terrain.RenderSkyBox(vao, positionBuffer, textureBuffer)
+		x, y, z := Player.GetPosition()
+		Terrain.RenderSkyBox(vao, positionBuffer, textureBuffer, x, y, z)
 		Player.Render(vao, positionBuffer, textureBuffer)
 
 		Player.MovePlayer(window)

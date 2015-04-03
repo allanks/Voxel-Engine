@@ -393,13 +393,15 @@ func genChunk(x, z int, mongoSession *mgo.Session) {
 
 func genLayer(c *Chunk, x, y, z, cubeType int, collection *mgo.Collection, waitGroup *sync.WaitGroup) {
 	defer waitGroup.Done()
+	bulk := collection.Bulk()
 	for x := 0; x < chunkSize; x++ {
 		for z := 0; z < chunkSize; z++ {
-			err := collection.Insert(&Terrain.Cube{ChunkID: c.ID, XPos: x, YPos: y, ZPos: z, CubeType: cubeType})
-			if err != nil {
-				log.Printf("RunQuery : ERROR : %s\n", err)
-			}
+			bulk.Insert(Terrain.Cube{ChunkID: c.ID, XPos: x, YPos: y, ZPos: z, CubeType: cubeType})
 		}
+	}
+	_, err := bulk.Run()
+	if err != nil {
+		log.Printf("RunQuery : ERROR : %s\n", err)
 	}
 }
 

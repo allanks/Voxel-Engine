@@ -20,8 +20,7 @@ const (
 )
 
 type skyBox struct {
-	texture  []float32
-	position []float32
+	texture []float32
 }
 
 type GCube struct {
@@ -98,7 +97,8 @@ func InitialiseGCubeBuffers() (uint32, uint32, uint32) {
 	return vao, positionBuffer, textureBuffer
 }
 
-func RenderSkyBox(vao, positionBuffer, textureBuffer uint32) {
+func RenderSkyBox(vao, positionBuffer, textureBuffer uint32, x, y, z float64) {
+	position := []float32{float32(x) - 0.5, float32(y) - 0.5, float32(z) - 0.5}
 	gl.DepthMask(false)
 
 	gl.BindVertexArray(vao)
@@ -107,7 +107,7 @@ func RenderSkyBox(vao, positionBuffer, textureBuffer uint32) {
 	gl.BufferData(gl.ARRAY_BUFFER, len(sky.texture)*4, gl.Ptr(sky.texture), gl.STATIC_DRAW)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
-	gl.BufferData(gl.ARRAY_BUFFER, len(sky.position)*4, gl.Ptr(sky.position), gl.STATIC_DRAW)
+	gl.BufferData(gl.ARRAY_BUFFER, len(position)*4, gl.Ptr(position), gl.STATIC_DRAW)
 
 	gl.DrawArraysInstanced(gl.TRIANGLE_STRIP, 0, 24, int32(1))
 
@@ -309,9 +309,6 @@ func InitGCubes() {
 		2, 2,
 		1, 1,
 		1, 2,
-	}
-	sky.position = []float32{
-		-0.5, -0.5, -0.5,
 	}
 	sky.texture = []float32{
 		// front
