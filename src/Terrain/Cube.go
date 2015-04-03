@@ -1,8 +1,6 @@
 package Terrain
 
 import (
-	"fmt"
-
 	"github.com/allanks/Voxel-Engine/src/Graphics"
 	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"gopkg.in/mgo.v2/bson"
@@ -10,7 +8,7 @@ import (
 
 const (
 	collisionDistance float64 = 0.15
-	textureDir        string  = "resource/texture/"
+	textureAtlas      string  = "resource/texture/textureAtlas.png"
 )
 const (
 	// Cube Types
@@ -20,6 +18,16 @@ const (
 	CobbleStone
 	Gravel
 )
+
+type skyBox struct {
+	texture  []float32
+	position []float32
+}
+
+type GCube struct {
+	Texture []float32
+	Gtype   int
+}
 
 type Cube struct {
 	ID       bson.ObjectId `bson:"_id,omitempty"`
@@ -44,6 +52,8 @@ func (cube *Cube) CheckCollision(xPos, yPos, zPos int) bool {
 	return false
 }
 
+var sky skyBox
+
 var GCubes = []GCube{
 	GCube{},
 	GCube{},
@@ -54,102 +64,8 @@ var GCubes = []GCube{
 
 var instances int32
 
-func InitGCubes() {
-	// gCubes[Dirt].backColor = []float32{0.5, 0.25, 0.0}
-	// gCubes[Dirt].frontColor = []float32{0.5, 0.25, 0.0}
-	// gCubes[Dirt].leftColor = []float32{0.5, 0.25, 0.0}
-	// gCubes[Dirt].rightColor = []float32{0.5, 0.25, 0.0}
-	GCubes[Dirt].topColor = []float32{0.5, 0.25, 0.0}
-	// gCubes[Dirt].bottomColor = []float32{0.5, 0.25, 0.0}
-
-	// gCubes[Grass].backColor = []float32{0.5, 0.25, 0.0}
-	// gCubes[Grass].frontColor = []float32{0.5, 0.25, 0.0}
-	// gCubes[Grass].leftColor = []float32{0.5, 0.25, 0.0}
-	// gCubes[Grass].rightColor = []float32{0.5, 0.25, 0.0}
-	GCubes[Grass].topColor = []float32{0.0, 1.0, 0.0}
-	// gCubes[Grass].bottomColor = []float32{0.5, 0.25, 0.0}
-
-	// gCubes[Stone].backColor = []float32{0.5, 0.5, 0.5}
-	// gCubes[Stone].frontColor = []float32{0.5, 0.5, 0.5}
-	// gCubes[Stone].leftColor = []float32{0.5, 0.5, 0.5}
-	// gCubes[Stone].rightColor = []float32{0.5, 0.5, 0.5}
-	GCubes[Stone].topColor = []float32{0.5, 0.5, 0.5}
-	// gCubes[Stone].bottomColor = []float32{0.5, 0.5, 0.5}
-
-	// gCubes[CobbleStone].backColor = []float32{0.25, 0.25, 0.25}
-	// gCubes[CobbleStone].frontColor = []float32{0.25, 0.25, 0.25}
-	// gCubes[CobbleStone].leftColor = []float32{0.25, 0.25, 0.25}
-	// gCubes[CobbleStone].rightColor = []float32{0.25, 0.25, 0.25}
-	GCubes[CobbleStone].topColor = []float32{0.25, 0.25, 0.25}
-	// gCubes[CobbleStone].bottomColor = []float32{0.25, 0.25, 0.25}
-
-	// gCubes[Gravel].backColor = []float32{0.3, 0.0, 0.2}
-	// gCubes[Gravel].frontColor = []float32{0.3, 0.0, 0.2}
-	// gCubes[Gravel].leftColor = []float32{0.3, 0.0, 0.2}
-	// gCubes[Gravel].rightColor = []float32{0.3, 0.0, 0.2}
-	GCubes[Gravel].topColor = []float32{0.3, 0.0, 0.2}
-	// gCubes[Gravel].bottomColor = []float32{0.3, 0.0, 0.2}
-	/*gCubes[Dirt].initCubeTextures(textureDir + "Dirt")
-	gCubes[Grass].initCubeTextures(textureDir + "Grass")
-	gCubes[Stone].initCubeTextures(textureDir + "Stone")
-	gCubes[CobbleStone].initCubeTextures(textureDir + "CobbleStone")
-	gCubes[Gravel].initCubeTextures(textureDir + "Gravel")*/
-}
-
-type GCube struct {
-	topTexture,
-	bottomTexture,
-	frontTexture,
-	backTexture,
-	leftTexture,
-	rightTexture uint32
-	topColor,
-	bottomColor,
-	rightColor,
-	leftColor,
-	frontColor,
-	backColor []float32
-}
-
-func (cube *GCube) GetColors() []float32 {
-	colors := []float32{}
-	colors = append(colors, cube.topColor...)
-	return colors
-}
-
-func (cube *GCube) initCubeTextures(dir string) {
-	fmt.Printf("%v\n", "Loading Textures from: "+dir)
-
-	// Load the textures
-	var err error
-	cube.topTexture, err = Graphics.NewTexture(dir + "/topFace.png")
-	if err != nil {
-		panic(err)
-	}
-	cube.bottomTexture, err = Graphics.NewTexture(dir + "/bottomFace.png")
-	if err != nil {
-		panic(err)
-	}
-	cube.frontTexture, err = Graphics.NewTexture(dir + "/frontFace.png")
-	if err != nil {
-		panic(err)
-	}
-	cube.backTexture, err = Graphics.NewTexture(dir + "/backFace.png")
-	if err != nil {
-		panic(err)
-	}
-	cube.leftTexture, err = Graphics.NewTexture(dir + "/rightFace.png")
-	if err != nil {
-		panic(err)
-	}
-	cube.rightTexture, err = Graphics.NewTexture(dir + "/leftFace.png")
-	if err != nil {
-		panic(err)
-	}
-}
-
 func InitialiseGCubeBuffers() (uint32, uint32, uint32) {
-	var vao, positionBuffer, colorBuffer uint32
+	var vao, positionBuffer uint32
 	gl.GenVertexArrays(1, &vao)
 	gl.BindVertexArray(vao)
 
@@ -162,7 +78,6 @@ func InitialiseGCubeBuffers() (uint32, uint32, uint32) {
 
 	gl.GenBuffers(1, &textureBuffer)
 	gl.BindBuffer(gl.ARRAY_BUFFER, textureBuffer)
-	gl.BufferData(gl.ARRAY_BUFFER, len(cubeTexCoords)*4, gl.Ptr(cubeTexCoords), gl.STATIC_DRAW)
 	gl.EnableVertexAttribArray(1)
 	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 0, gl.PtrOffset(0))
 
@@ -172,12 +87,31 @@ func InitialiseGCubeBuffers() (uint32, uint32, uint32) {
 	gl.VertexAttribPointer(2, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
 	gl.VertexAttribDivisor(2, 1)
 
-	gl.GenBuffers(1, &colorBuffer)
-	gl.BindBuffer(gl.ARRAY_BUFFER, colorBuffer)
-	gl.EnableVertexAttribArray(3)
-	gl.VertexAttribPointer(3, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
-	gl.VertexAttribDivisor(3, 1)
-	return vao, positionBuffer, colorBuffer
+	texture, err := Graphics.NewTexture(textureAtlas)
+	if err != nil {
+		panic(err)
+	}
+
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.BindTexture(gl.TEXTURE_2D, texture)
+
+	return vao, positionBuffer, textureBuffer
+}
+
+func RenderSkyBox(vao, positionBuffer, textureBuffer uint32) {
+	gl.DepthMask(false)
+
+	gl.BindVertexArray(vao)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, textureBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, len(sky.texture)*4, gl.Ptr(sky.texture), gl.STATIC_DRAW)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, len(sky.position)*4, gl.Ptr(sky.position), gl.STATIC_DRAW)
+
+	gl.DrawArraysInstanced(gl.TRIANGLE_STRIP, 0, 24, int32(1))
+
+	gl.DepthMask(true)
 }
 
 var cubeVertices = []float32{
@@ -214,35 +148,206 @@ var cubeVertices = []float32{
 	0.0, 0.0, 1.0,
 }
 
-var cubeTexCoords = []float32{
-	// Front face
-	1.0, 0.0,
-	1.0, 1.0,
-	0.0, 0.0,
-	0.0, 1.0,
-	// Back face
-	1.0, 0.0,
-	1.0, 1.0,
-	0.0, 0.0,
-	0.0, 1.0,
-	// Left face
-	1.0, 0.0,
-	1.0, 1.0,
-	0.0, 0.0,
-	0.0, 1.0,
-	// Right face
-	1.0, 0.0,
-	1.0, 1.0,
-	0.0, 0.0,
-	0.0, 1.0,
-	// Top face
-	1.0, 0.0,
-	1.0, 1.0,
-	0.0, 0.0,
-	0.0, 1.0,
-	// Bottom face
-	1.0, 0.0,
-	1.0, 1.0,
-	0.0, 0.0,
-	0.0, 1.0,
+func InitGCubes() {
+	GCubes[Dirt].Gtype = Dirt
+	GCubes[Grass].Gtype = Grass
+	GCubes[Stone].Gtype = Stone
+	GCubes[CobbleStone].Gtype = CobbleStone
+	GCubes[Gravel].Gtype = Gravel
+
+	GCubes[Dirt].Texture = []float32{
+		2, 0,
+		2, 1,
+		1, 0,
+		1, 1,
+
+		2, 0,
+		2, 1,
+		1, 0,
+		1, 1,
+
+		2, 0,
+		2, 1,
+		1, 0,
+		1, 1,
+
+		2, 0,
+		2, 1,
+		1, 0,
+		1, 1,
+
+		2, 0,
+		2, 1,
+		1, 0,
+		1, 1,
+
+		2, 0,
+		2, 1,
+		1, 0,
+		1, 1,
+	}
+	GCubes[Grass].Texture = []float32{
+		1, 1,
+		1, 2,
+		0, 1,
+		0, 2,
+
+		1, 1,
+		1, 2,
+		0, 1,
+		0, 2,
+
+		1, 1,
+		1, 2,
+		0, 1,
+		0, 2,
+
+		1, 1,
+		1, 2,
+		0, 1,
+		0, 2,
+
+		1, 1,
+		1, 2,
+		0, 1,
+		0, 2,
+
+		1, 1,
+		1, 2,
+		0, 1,
+		0, 2,
+	}
+	GCubes[Stone].Texture = []float32{
+		2, 2,
+		2, 3,
+		1, 2,
+		1, 3,
+
+		2, 2,
+		2, 3,
+		1, 2,
+		1, 3,
+
+		2, 2,
+		2, 3,
+		1, 2,
+		1, 3,
+
+		2, 2,
+		2, 3,
+		1, 2,
+		1, 3,
+
+		2, 2,
+		2, 3,
+		1, 2,
+		1, 3,
+
+		2, 2,
+		2, 3,
+		1, 2,
+		1, 3,
+	}
+	GCubes[CobbleStone].Texture = []float32{
+		1, 0,
+		1, 1,
+		0, 0,
+		0, 1,
+
+		1, 0,
+		1, 1,
+		0, 0,
+		0, 1,
+
+		1, 0,
+		1, 1,
+		0, 0,
+		0, 1,
+
+		1, 0,
+		1, 1,
+		0, 0,
+		0, 1,
+
+		1, 0,
+		1, 1,
+		0, 0,
+		0, 1,
+
+		1, 0,
+		1, 1,
+		0, 0,
+		0, 1,
+	}
+	GCubes[Gravel].Texture = []float32{
+		2, 1,
+		2, 2,
+		1, 1,
+		1, 2,
+
+		2, 1,
+		2, 2,
+		1, 1,
+		1, 2,
+
+		2, 1,
+		2, 2,
+		1, 1,
+		1, 2,
+
+		2, 1,
+		2, 2,
+		1, 1,
+		1, 2,
+
+		2, 1,
+		2, 2,
+		1, 1,
+		1, 2,
+
+		2, 1,
+		2, 2,
+		1, 1,
+		1, 2,
+	}
+	sky.position = []float32{
+		-0.5, -0.5, -0.5,
+	}
+	sky.texture = []float32{
+		// front
+		4, 0,
+		4, 1,
+		3, 0,
+		3, 1,
+
+		// back
+		3, 0,
+		3, 1,
+		2, 0,
+		2, 1,
+
+		// left
+		4, 1,
+		4, 2,
+		3, 1,
+		3, 2,
+
+		//right
+		1, 2,
+		1, 3,
+		0, 2,
+		0, 3,
+
+		// top
+		1, 3,
+		1, 4,
+		0, 3,
+		0, 4,
+
+		// bottom
+		3, 1,
+		3, 2,
+		2, 1,
+		2, 2,
+	}
 }

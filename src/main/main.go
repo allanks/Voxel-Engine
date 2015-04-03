@@ -97,7 +97,11 @@ func initOpenGLProgram(window *glfw.Window) {
 	}
 	gl.UseProgram(program)
 
+	fmt.Println("Initialising GCubes")
+
 	Terrain.InitGCubes()
+
+	fmt.Println("Generating Player")
 
 	Player.GenPlayer(5, 34, 5)
 
@@ -115,11 +119,14 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
-	vao, positionBuffer, colorBuffer := Terrain.InitialiseGCubeBuffers()
-	Graphics.InitSkybox()
+	fmt.Println("Initialising Buffers")
+
+	vao, positionBuffer, textureBuffer := Terrain.InitialiseGCubeBuffers()
 
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
+
+	fmt.Println("Starting Draw Loop")
 
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -129,9 +136,8 @@ func initOpenGLProgram(window *glfw.Window) {
 		camera := Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 
-		//Graphics.RenderSkybox(Player.GetPosition())
-
-		Player.Render(vao, positionBuffer, colorBuffer)
+		Terrain.RenderSkyBox(vao, positionBuffer, textureBuffer)
+		Player.Render(vao, positionBuffer, textureBuffer)
 
 		Player.MovePlayer(window)
 
@@ -160,14 +166,11 @@ uniform mat4 rotate;
 layout(location=0) in vec3 vert; // cube vertex position
 layout(location=1) in vec2 vertTexCoord; // cube texture coordinates
 layout(location=2) in vec3 pos; // instance data, unique to each object (instance)
-layout(location=3) in vec3 color; // instance data, unique to each object (instance)
 
-//out vec2 fragTexCoord;
-out vec3 fragColor;
+out vec2 fragTexCoord;
 
 void main() {
-    //fragTexCoord = vertTexCoord;
-    fragColor = color;
+    fragTexCoord = vertTexCoord;
     gl_Position = projection * camera * rotate * (vec4( vert + pos , 1));
 }
 ` + "\x00"
@@ -177,14 +180,11 @@ var fragmentShader = `
 
 uniform sampler2D tex;
 
-// in vec2 fragTexCoord;
-in vec3 fragColor;
+in vec2 fragTexCoord;
 
-//out vec4 outputColor;
-out vec3 outputColor;
+out vec4 outputColor;
 
 void main() {
-    //outputColor = texture(tex, fragTexCoord);
-    outputColor = fragColor;
+    outputColor = texture(tex, (fragTexCoord*0.125));
 }
 ` + "\x00"

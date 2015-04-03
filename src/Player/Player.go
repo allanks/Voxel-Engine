@@ -5,6 +5,7 @@ import (
 	"log"
 	m "math"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/allanks/Voxel-Engine/src/Terrain"
@@ -204,10 +205,10 @@ func (gameMap *level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool
 		if pX >= (c.XPos-1)*chunkSize && pX <= (c.XPos+1)*chunkSize && pZ >= (c.ZPos-1)*chunkSize && pZ <= (c.ZPos+1)*chunkSize {
 			x := c.XPos * chunkSize
 			z := c.ZPos * chunkSize
-			for i := 0; i < (len(c.instances) / 3); i++ {
-				cX := c.instances[i*3] + x
-				cY := c.instances[(i*3)+1]
-				cZ := c.instances[(i*3)+2] + z
+			for _, cube := range c.cubes {
+				cX := cube.x + x
+				cY := cube.y
+				cZ := cube.z + z
 				if (cX == pX || cX == pXpC || cX == pXmC) &&
 					(cZ == pZ || cZ == pZpC || cZ == pZmC) &&
 					cY == pY {
@@ -252,7 +253,7 @@ func (p *player) loopChunkLoader(mongoSession *mgo.Session) {
 		if !checkForChunk(x, z-1, p.gameMap.chunks) {
 			p.loadNewChunk(x, z-1, collection, mongoSession)
 		}
-		time.Sleep(10 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -293,7 +294,7 @@ func checkForChunk(x, z int, chunks []*Chunk) bool {
 		if ch == nil {
 			continue
 		}
-		if ch.XPos == x && ch.ZPos == z {
+		if ch.XPos == x && ch.ZPos == z && ch.fullyLoaded {
 			return true
 		}
 	}
@@ -318,29 +319,19 @@ func closeMongoSession() {
 }
 
 type Chunk struct {
-	ID         bson.ObjectId `bson:"_id,omitempty"`
-	XPos, ZPos int
-	instances  []int
-	colors     []float32
+	ID          bson.ObjectId `bson:"_id,omitempty"`
+	XPos, ZPos  int
+	fullyLoaded bool
+	cubes       []chunkCube
 }
 
-func (c *Chunk) getPositions() []float32 {
-	val := []float32{}
-	for i := 0; i < (len(c.instances) / 3); i++ {
-		val = append(val, float32((c.XPos*chunkSize)+c.instances[i*3]), float32(c.instances[(i*3)+1]), float32((c.ZPos*chunkSize)+c.instances[(i*3)+2]))
-	}
-	return val
-}
-
-func (c *Chunk) getColors() []float32 {
-	return c.colors
+type chunkCube struct {
+	x, y, z, cubeType int
 }
 
 func (c *Chunk) Update(cubes []Terrain.Cube) {
 	for _, cube := range cubes {
-		c.instances = append(c.instances, cube.XPos, cube.YPos, cube.ZPos)
-		gCube := Terrain.GCubes[cube.CubeType]
-		c.colors = append(c.colors, gCube.GetColors()...)
+		c.cubes = append(c.cubes, chunkCube{cube.XPos, cube.YPos, cube.ZPos, cube.GetCubeType()})
 	}
 }
 
@@ -351,6 +342,17 @@ func (c *Chunk) loadChunk(mongoSession *mgo.Session) {
 	cubes := []Terrain.Cube{}
 	collection.Find(bson.M{"chunkid": c.ID}).All(&cubes)
 	c.Update(cubes)
+	c.fullyLoaded = true
+}
+
+func (c *Chunk) getCubeArray(cubeType int) []float32 {
+	positions := []float32{}
+	for _, cube := range c.cubes {
+		if cube.cubeType == cubeType {
+			positions = append(positions, float32(cube.x+(c.XPos*chunkSize)), float32(cube.y), float32(cube.z+(c.ZPos*chunkSize)))
+		}
+	}
+	return positions
 }
 
 const (
@@ -370,7 +372,10 @@ func genChunk(x, z int, mongoSession *mgo.Session) {
 		log.Printf("RunQuery : ERROR : %s\n", err)
 	}
 	collection = session.DB("GameDatabase").C("Cubes")
+
 	var cubeType int
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(seaLevel)
 	for yPos := 0; yPos < seaLevel; yPos++ {
 		if (yPos + 1) >= seaLevel {
 			cubeType = Terrain.Grass
@@ -381,43 +386,51 @@ func genChunk(x, z int, mongoSession *mgo.Session) {
 		} else {
 			cubeType = Terrain.Stone
 		}
-		for x := 0; x < chunkSize; x++ {
-			for z := 0; z < chunkSize; z++ {
-				err := collection.Insert(&Terrain.Cube{ChunkID: c.ID, XPos: x, YPos: yPos, ZPos: z, CubeType: cubeType})
-				if err != nil {
-					log.Printf("RunQuery : ERROR : %s\n", err)
-				}
+		go genLayer(c, x, yPos, z, cubeType, collection, &waitGroup)
+	}
+	waitGroup.Wait()
+}
+
+func genLayer(c *Chunk, x, y, z, cubeType int, collection *mgo.Collection, waitGroup *sync.WaitGroup) {
+	defer waitGroup.Done()
+	for x := 0; x < chunkSize; x++ {
+		for z := 0; z < chunkSize; z++ {
+			err := collection.Insert(&Terrain.Cube{ChunkID: c.ID, XPos: x, YPos: y, ZPos: z, CubeType: cubeType})
+			if err != nil {
+				log.Printf("RunQuery : ERROR : %s\n", err)
 			}
 		}
 	}
 }
 
-func Render(vao, positionBuffer, colorBuffer uint32) {
-	user.gameMap.RenderLevel(vao, positionBuffer, colorBuffer)
+func Render(vao, positionBuffer, textureBuffer uint32) {
+	user.gameMap.RenderLevel(vao, positionBuffer, textureBuffer)
 }
 
-func (gameMap *level) RenderLevel(vao, positionBuffer, colorBuffer uint32) {
+func (gameMap *level) RenderLevel(vao, positionBuffer, textureBuffer uint32) {
 
 	gl.BindVertexArray(vao)
 
 	for _, c := range gameMap.chunks {
-		if c == nil {
+		if c == nil || len(c.cubes) == 0 {
 			continue
 		}
-		positions := c.getPositions()
-		colors := c.getColors()
+		for _, gCube := range Terrain.GCubes {
+			positions := c.getCubeArray(gCube.Gtype)
 
-		if len(positions) == 0 || len(colors) == 0 {
-			continue
+			if len(positions) == 0 {
+				continue
+			}
+
+			gl.BindBuffer(gl.ARRAY_BUFFER, textureBuffer)
+			gl.BufferData(gl.ARRAY_BUFFER, len(gCube.Texture)*4, gl.Ptr(gCube.Texture), gl.STATIC_DRAW)
+
+			gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+			gl.BufferData(gl.ARRAY_BUFFER, len(positions)*4, gl.Ptr(positions), gl.STATIC_DRAW)
+
+			instances := int32(len(positions) / 3)
+			gl.DrawArraysInstanced(gl.TRIANGLE_STRIP, 0, 24, int32(instances))
 		}
-
-		gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
-		gl.BufferData(gl.ARRAY_BUFFER, len(positions)*4, gl.Ptr(positions), gl.STATIC_DRAW)
-		gl.BindBuffer(gl.ARRAY_BUFFER, colorBuffer)
-		gl.BufferData(gl.ARRAY_BUFFER, len(colors)*4, gl.Ptr(colors), gl.STATIC_DRAW)
-
-		instances := int32(len(colors) / 3)
-		gl.DrawArraysInstanced(gl.TRIANGLE_STRIP, 0, 24, int32(instances))
 	}
 
 }
