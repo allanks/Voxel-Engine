@@ -146,13 +146,7 @@ func initOpenGLProgram(window *glfw.Window) {
 	}
 }
 
-func startProgram() {
-
-}
-
 func main() {
-
-	go startProgram()
 	initializeWindow()
 }
 

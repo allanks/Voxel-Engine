@@ -25,23 +25,20 @@ type skyBox struct {
 
 type GCube struct {
 	Texture []float32
-	Gtype   int
+	Gtype   uint8
 }
 
 type Cube struct {
-	ID       bson.ObjectId `bson:"_id,omitempty"`
-	ChunkID  bson.ObjectId
-	XPos     int
-	YPos     int
-	ZPos     int
-	CubeType int
+	ID                         bson.ObjectId `bson:"_id,omitempty"`
+	ChunkID                    bson.ObjectId
+	XPos, YPos, ZPos, CubeType uint8
 }
 
-func (cube *Cube) GetCubeType() int {
+func (cube *Cube) GetCubeType() uint8 {
 	return cube.CubeType
 }
 
-func (cube *Cube) CheckCollision(xPos, yPos, zPos int) bool {
+func (cube *Cube) CheckCollision(xPos, yPos, zPos uint8) bool {
 
 	if xPos == cube.XPos &&
 		yPos == cube.YPos &&
