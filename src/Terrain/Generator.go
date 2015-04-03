@@ -12,7 +12,7 @@ import (
 
 const (
 	mongodb   string = "localhost:27017"
-	chunkSize int    = 32
+	chunkSize int    = 64
 	seaLevel  int    = 30
 )
 
@@ -49,6 +49,28 @@ func (c *chunk) Update(cubes []Cube) {
 		gCube := gCubes[cube.CubeType]
 		c.colors = append(c.colors, gCube.getColors()...)
 	}
+}
+
+func isCubeVisible(xPos, yPos, zPos int, cubes []Cube) bool {
+	up, down, left, right, front, back := false, false, false, false, false, false
+
+	for _, cube := range cubes {
+		switch {
+		case cube.XPos == xPos+1 && cube.YPos == yPos && cube.ZPos == zPos:
+			front = true
+		case cube.XPos == xPos-1 && cube.YPos == yPos && cube.ZPos == zPos:
+			back = true
+		case cube.XPos == xPos && cube.YPos == yPos+1 && cube.ZPos == zPos:
+			up = true
+		case cube.XPos == xPos && cube.YPos == yPos-1 && cube.ZPos == zPos:
+			down = true
+		case cube.XPos == xPos && cube.YPos == yPos && cube.ZPos == zPos+1:
+			left = true
+		case cube.XPos == xPos && cube.YPos == yPos && cube.ZPos == zPos-1:
+			right = true
+		}
+	}
+	return up && down && left && right && front && back
 }
 
 func GenLevel() {
@@ -167,16 +189,18 @@ func IsInCube(xPos, yPos, zPos, collisionDistance float64) bool {
 	pZpC := int(m.Floor(zPos + collisionDistance))
 	pZmC := int(m.Floor(zPos - collisionDistance))
 	for _, c := range gameMap.chunks {
-		x := c.XPos * chunkSize
-		z := c.ZPos * chunkSize
-		for i := 0; i < (len(c.instances) / 3); i++ {
-			cX := c.instances[i*3] + x
-			cY := c.instances[(i*3)+1]
-			cZ := c.instances[(i*3)+2] + z
-			if (cX == pX || cX == pXpC || cX == pXmC) &&
-				(cZ == pZ || cZ == pZpC || cZ == pZmC) &&
-				cY == pY {
-				return true
+		if pX >= (c.XPos-1)*chunkSize && pX <= (c.XPos+1)*chunkSize && pZ >= (c.ZPos-1)*chunkSize && pZ <= (c.ZPos+1)*chunkSize {
+			x := c.XPos * chunkSize
+			z := c.ZPos * chunkSize
+			for i := 0; i < (len(c.instances) / 3); i++ {
+				cX := c.instances[i*3] + x
+				cY := c.instances[(i*3)+1]
+				cZ := c.instances[(i*3)+2] + z
+				if (cX == pX || cX == pXpC || cX == pXmC) &&
+					(cZ == pZ || cZ == pZpC || cZ == pZmC) &&
+					cY == pY {
+					return true
+				}
 			}
 		}
 	}
