@@ -209,9 +209,9 @@ func (gameMap *level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool
 				cX := int32(cube.x) + x
 				cY := int32(cube.y)
 				cZ := int32(cube.z) + z
-				if (cX == pX || cX == pXpC || cX == pXmC) &&
-					(cZ == pZ || cZ == pZpC || cZ == pZmC) &&
-					cY == pY {
+				if cY == pY &&
+					(cX == pX || cX == pXpC || cX == pXmC) &&
+					(cZ == pZ || cZ == pZpC || cZ == pZmC) {
 					return true
 				}
 			}
@@ -357,7 +357,7 @@ func (c *Chunk) getCubeArray(cubeType uint8) []float32 {
 
 const (
 	chunkSize uint8 = 64
-	seaLevel  uint8 = 30
+	seaLevel  uint8 = 64
 )
 
 func genChunk(x, z int32, mongoSession *mgo.Session) {

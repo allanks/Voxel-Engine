@@ -2,12 +2,13 @@
 	"folders":
 	[
 		{
-			"follow_symlinks": true,
 			"path": "Z:\\Programming\\golang"
 		},
 		{
-			"follow_symlinks": true,
 			"path": "."
+		},
+		{
+			"path": "Z:\\Programming\\golang\\src\\github.com\\allanks\\Generics"
 		}
 	]
 }
