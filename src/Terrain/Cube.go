@@ -70,7 +70,7 @@ func InitialiseGCubeBuffers() (uint32, uint32, uint32) {
 	gl.GenVertexArrays(1, &vao)
 	gl.BindVertexArray(vao)
 
-	var vertexBuffer, textureBuffer uint32
+	var vertexBuffer, textureBuffer, indexBuffer uint32
 	gl.GenBuffers(1, &vertexBuffer)
 	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, len(cubeVertices)*4, gl.Ptr(cubeVertices), gl.STATIC_DRAW)
@@ -88,12 +88,18 @@ func InitialiseGCubeBuffers() (uint32, uint32, uint32) {
 	gl.VertexAttribPointer(2, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
 	gl.VertexAttribDivisor(2, 1)
 
+	gl.GenBuffers(1, &indexBuffer)
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(CubeElements)*4, gl.Ptr(CubeElements), gl.STATIC_DRAW)
+
 	texture, err := Graphics.NewTexture(textureAtlas)
 	if err != nil {
 		panic(err)
 	}
 
 	gl.ActiveTexture(gl.TEXTURE0)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 
 	return vao, positionBuffer, textureBuffer
@@ -111,7 +117,7 @@ func RenderSkyBox(vao, positionBuffer, textureBuffer uint32, x, y, z float64) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, len(position)*4, gl.Ptr(position), gl.STATIC_DRAW)
 
-	gl.DrawArraysInstanced(gl.TRIANGLE_STRIP, 0, 24, int32(1))
+	gl.DrawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_INT, gl.Ptr(nil), int32(1))
 
 	gl.DepthMask(true)
 }
@@ -124,30 +130,51 @@ var cubeVertices = []float32{
 	0.0, 1.0, 1.0,
 	0.0, 0.0, 1.0,
 	// Back face
-	1.0, 0.0, 0.0,
-	0.0, 0.0, 0.0,
 	1.0, 1.0, 0.0,
+	1.0, 0.0, 0.0,
 	0.0, 1.0, 0.0,
+	0.0, 0.0, 0.0,
 	// Left face
 	0.0, 1.0, 1.0,
-	0.0, 0.0, 1.0,
 	0.0, 1.0, 0.0,
+	0.0, 0.0, 1.0,
 	0.0, 0.0, 0.0,
 	// Right face
-	1.0, 1.0, 0.0,
-	1.0, 0.0, 0.0,
 	1.0, 1.0, 1.0,
+	1.0, 1.0, 0.0,
 	1.0, 0.0, 1.0,
+	1.0, 0.0, 0.0,
 	// Top face
-	0.0, 1.0, 0.0,
+	1.0, 1.0, 1.0,
 	1.0, 1.0, 0.0,
 	0.0, 1.0, 1.0,
-	1.0, 1.0, 1.0,
+	0.0, 1.0, 0.0,
 	// Bottom face
-	1.0, 0.0, 0.0,
-	0.0, 0.0, 0.0,
 	1.0, 0.0, 1.0,
+	1.0, 0.0, 0.0,
 	0.0, 0.0, 1.0,
+	0.0, 0.0, 0.0,
+}
+
+var CubeElements = []uint32{
+	// front
+	0, 1, 2,
+	1, 3, 2,
+	// back
+	4, 5, 6,
+	5, 7, 6,
+	// Left
+	8, 9, 10,
+	9, 11, 10,
+	// Right
+	12, 13, 14,
+	13, 15, 14,
+	// Top
+	16, 17, 18,
+	17, 19, 18,
+	// Bottom
+	20, 21, 22,
+	21, 23, 22,
 }
 
 func InitGCubes() {
@@ -155,40 +182,40 @@ func InitGCubes() {
 		// Front and back are swapped as we are view from inside the cube
 
 		// front
+		1, 1,
+		1, 2,
+		2, 1,
 		2, 2,
-		2, 3,
-		1, 2,
-		1, 3,
 
-		// back
+		//back
+		1, 1,
 		1, 2,
-		1, 3,
+		0, 1,
 		0, 2,
-		0, 3,
 
 		// left
-		1, 1,
-		1, 2,
-		0, 1,
 		0, 2,
-
-		//right
-		2, 1,
-		2, 2,
-		1, 1,
 		1, 2,
+		0, 3,
+		1, 3,
+
+		// right
+		2, 2,
+		1, 2,
+		2, 3,
+		1, 3,
 
 		// top
-		1, 0,
-		1, 1,
-		0, 0,
 		0, 1,
+		0, 0,
+		1, 1,
+		1, 0,
 
 		// bottom
-		2, 0,
-		2, 1,
 		1, 0,
 		1, 1,
+		2, 0,
+		2, 1,
 	}
 
 	GCubes[Dirt].Gtype = Dirt
@@ -197,161 +224,24 @@ func InitGCubes() {
 	GCubes[CobbleStone].Gtype = CobbleStone
 	GCubes[Gravel].Gtype = Gravel
 
-	GCubes[Dirt].Texture = []float32{
-		3, 1,
-		3, 2,
-		2, 1,
-		2, 2,
+	GCubes[Dirt].Texture = loadTexCoords(2, 1)
+	GCubes[Grass].Texture = loadTexCoords(2, 2)
+	GCubes[Stone].Texture = loadTexCoords(1, 3)
+	GCubes[CobbleStone].Texture = loadTexCoords(2, 0)
+	GCubes[Gravel].Texture = loadTexCoords(0, 3)
+}
 
-		3, 1,
-		3, 2,
-		2, 1,
-		2, 2,
-
-		3, 1,
-		3, 2,
-		2, 1,
-		2, 2,
-
-		3, 1,
-		3, 2,
-		2, 1,
-		2, 2,
-
-		3, 1,
-		3, 2,
-		2, 1,
-		2, 2,
-
-		3, 1,
-		3, 2,
-		2, 1,
-		2, 2,
+func loadTexCoords(u, v float32) []float32 {
+	tex := []float32{}
+	for i := 0; i < 6; i++ {
+		tex = append(tex,
+			u, v, // 1
+			u, v+1, // 2
+			u+1, v, // 3
+			u+1, v+1, // 4
+		)
 	}
-	GCubes[Grass].Texture = []float32{
-		3, 2,
-		3, 3,
-		2, 2,
-		2, 3,
-
-		3, 2,
-		3, 3,
-		2, 2,
-		2, 3,
-
-		3, 2,
-		3, 3,
-		2, 2,
-		2, 3,
-
-		3, 2,
-		3, 3,
-		2, 2,
-		2, 3,
-
-		3, 2,
-		3, 3,
-		2, 2,
-		2, 3,
-
-		3, 2,
-		3, 3,
-		2, 2,
-		2, 3,
-	}
-	GCubes[Stone].Texture = []float32{
-		2, 3,
-		2, 4,
-		1, 3,
-		1, 4,
-
-		2, 3,
-		2, 4,
-		1, 3,
-		1, 4,
-
-		2, 3,
-		2, 4,
-		1, 3,
-		1, 4,
-
-		2, 3,
-		2, 4,
-		1, 3,
-		1, 4,
-
-		2, 3,
-		2, 4,
-		1, 3,
-		1, 4,
-
-		2, 3,
-		2, 4,
-		1, 3,
-		1, 4,
-	}
-	GCubes[CobbleStone].Texture = []float32{
-		3, 0,
-		3, 1,
-		2, 0,
-		2, 1,
-
-		3, 0,
-		3, 1,
-		2, 0,
-		2, 1,
-
-		3, 0,
-		3, 1,
-		2, 0,
-		2, 1,
-
-		3, 0,
-		3, 1,
-		2, 0,
-		2, 1,
-
-		3, 0,
-		3, 1,
-		2, 0,
-		2, 1,
-
-		3, 0,
-		3, 1,
-		2, 0,
-		2, 1,
-	}
-	GCubes[Gravel].Texture = []float32{
-		1, 3,
-		1, 4,
-		0, 3,
-		0, 4,
-
-		1, 3,
-		1, 4,
-		0, 3,
-		0, 4,
-
-		1, 3,
-		1, 4,
-		0, 3,
-		0, 4,
-
-		1, 3,
-		1, 4,
-		0, 3,
-		0, 4,
-
-		1, 3,
-		1, 4,
-		0, 3,
-		0, 4,
-
-		1, 3,
-		1, 4,
-		0, 3,
-		0, 4,
-	}
+	return tex
 }
 
 func PackTextures() {

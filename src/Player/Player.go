@@ -431,7 +431,7 @@ func (gameMap *level) RenderLevel(vao, positionBuffer, textureBuffer uint32) {
 			gl.BufferData(gl.ARRAY_BUFFER, len(positions)*4, gl.Ptr(positions), gl.STATIC_DRAW)
 
 			instances := int32(len(positions) / 3)
-			gl.DrawArraysInstanced(gl.TRIANGLE_STRIP, 0, 24, int32(instances))
+			gl.DrawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_INT, gl.Ptr(nil), int32(instances))
 		}
 	}
 

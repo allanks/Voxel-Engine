@@ -147,7 +147,7 @@ func initOpenGLProgram(window *glfw.Window) {
 }
 
 func main() {
-	Terrain.PackTextures()
+	//Terrain.PackTextures()
 	initializeWindow()
 }
 
