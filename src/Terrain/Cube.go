@@ -17,7 +17,8 @@ const (
 )
 const (
 	// Cube Types
-	Dirt = iota
+	Empty = iota
+	Dirt
 	Grass
 	Stone
 	CobbleStone
@@ -56,6 +57,7 @@ func (cube *Cube) CheckCollision(xPos, yPos, zPos uint8) bool {
 var sky skyBox
 
 var GCubes = []GCube{
+	GCube{},
 	GCube{},
 	GCube{},
 	GCube{},

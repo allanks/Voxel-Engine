@@ -45,6 +45,7 @@ type player struct {
 
 type level struct {
 	chunks []*Chunk
+	seed   int64
 }
 
 type moveFunc func(float64)
@@ -129,17 +130,17 @@ func move(direction float64) {
 	newX := user.xPos - (direction * xLook * moveSpeed)
 	newY := user.yPos + (direction * yLook * moveSpeed)
 	newZ := user.zPos - (direction * zLook * moveSpeed)
-	if !user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
-		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
+	if !user.gameMap.IsInCube(newX, user.yPos, user.zPos, collisionDistance) &&
+		!user.gameMap.IsInCube(newX, user.yPos+Height, user.zPos, collisionDistance) {
 		user.xPos = newX
 	}
 	if user.freeMovement &&
-		!user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
-		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
+		!user.gameMap.IsInCube(user.xPos, newY, user.zPos, collisionDistance) &&
+		!user.gameMap.IsInCube(user.xPos, newY+Height, user.zPos, collisionDistance) {
 		user.yPos = newY
 	}
-	if !user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
-		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
+	if !user.gameMap.IsInCube(user.xPos, user.yPos, newZ, collisionDistance) &&
+		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, newZ, collisionDistance) {
 		user.zPos = newZ
 	}
 }
@@ -150,12 +151,12 @@ func strafe(direction float64) {
 	newX := user.xPos + (-1 * direction * zLook * moveSpeed)
 	newZ := user.zPos + (direction * xLook * moveSpeed)
 
-	if !user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
-		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
+	if !user.gameMap.IsInCube(newX, user.yPos, user.zPos, collisionDistance) &&
+		!user.gameMap.IsInCube(newX, user.yPos+Height, user.zPos, collisionDistance) {
 		user.xPos = newX
 	}
-	if !user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance) &&
-		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, user.zPos, collisionDistance) {
+	if !user.gameMap.IsInCube(user.xPos, user.yPos, newZ, collisionDistance) &&
+		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, newZ, collisionDistance) {
 		user.zPos = newZ
 	}
 }
@@ -191,29 +192,29 @@ func OnKey(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw
 }
 
 func (gameMap *level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool {
-	pX := int32(m.Floor(xPos))
-	pY := int32(m.Floor(yPos))
-	pZ := int32(m.Floor(zPos))
-	pXpC := int32(m.Floor(xPos + collisionDistance))
-	pXmC := int32(m.Floor(xPos - collisionDistance))
-	pZpC := int32(m.Floor(zPos + collisionDistance))
-	pZmC := int32(m.Floor(zPos - collisionDistance))
+	pX := int(m.Floor(xPos))
+	pY := int(m.Floor(yPos))
+	pZ := int(m.Floor(zPos))
+	pXpC := ((int(m.Floor(xPos+collisionDistance)) % chunkSize) + chunkSize) % chunkSize
+	pXmC := ((int(m.Floor(xPos-collisionDistance)) % chunkSize) + chunkSize) % chunkSize
+	pZpC := ((int(m.Floor(zPos+collisionDistance)) % chunkSize) + chunkSize) % chunkSize
+	pZmC := ((int(m.Floor(zPos-collisionDistance)) % chunkSize) + chunkSize) % chunkSize
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("X+ %v X- %v Z+ %v Z- %v\n", pXpC, pXmC, pZpC, pZmC)
+			panic(r)
+		}
+	}()
 	for _, c := range gameMap.chunks {
 		if c == nil {
 			continue
 		}
-		if pX >= (c.XPos-1)*int32(chunkSize) && pX <= (c.XPos+1)*int32(chunkSize) && pZ >= (c.ZPos-1)*int32(chunkSize) && pZ <= (c.ZPos+1)*int32(chunkSize) {
-			x := c.XPos * int32(chunkSize)
-			z := c.ZPos * int32(chunkSize)
-			for _, cube := range c.cubes {
-				cX := int32(cube.x) + x
-				cY := int32(cube.y)
-				cZ := int32(cube.z) + z
-				if cY == pY &&
-					(cX == pX || cX == pXpC || cX == pXmC) &&
-					(cZ == pZ || cZ == pZpC || cZ == pZmC) {
-					return true
-				}
+		if pX >= (c.XPos-1)*chunkSize && pX <= (c.XPos+1)*chunkSize && pZ >= (c.ZPos-1)*chunkSize && pZ <= (c.ZPos+1)*chunkSize {
+			if c.cubes[pXpC][pY][pZpC] != Terrain.Empty ||
+				c.cubes[pXpC][pY][pZmC] != Terrain.Empty ||
+				c.cubes[pXmC][pY][pZpC] != Terrain.Empty ||
+				c.cubes[pXmC][pY][pZmC] != Terrain.Empty {
+				return true
 			}
 		}
 	}
@@ -224,8 +225,8 @@ func (p *player) loadGameMap(mongoSession *mgo.Session) {
 	session := mongoSession.Copy()
 	defer session.Close()
 	collection := session.DB("GameDatabase").C("Chunks")
-	x := int32(m.Floor(p.xPos / float64(chunkSize)))
-	z := int32(m.Floor(p.zPos / float64(chunkSize)))
+	x := int(m.Floor(p.xPos / float64(chunkSize)))
+	z := int(m.Floor(p.zPos / float64(chunkSize)))
 	p.loadNewChunk(x, z, collection, mongoSession)
 	go p.loopChunkLoader(mongoSession)
 }
@@ -235,8 +236,8 @@ func (p *player) loopChunkLoader(mongoSession *mgo.Session) {
 	defer session.Close()
 	collection := session.DB("GameDatabase").C("Chunks")
 	for {
-		x := int32(m.Floor(p.xPos / float64(chunkSize)))
-		z := int32(m.Floor(p.zPos / float64(chunkSize)))
+		x := int(m.Floor(p.xPos / float64(chunkSize)))
+		z := int(m.Floor(p.zPos / float64(chunkSize)))
 		p.removeOldChunks(x, z)
 		if !checkForChunk(x, z, p.gameMap.chunks) {
 			p.loadNewChunk(x, z, collection, mongoSession)
@@ -257,7 +258,7 @@ func (p *player) loopChunkLoader(mongoSession *mgo.Session) {
 	}
 }
 
-func (p *player) removeOldChunks(x, z int32) {
+func (p *player) removeOldChunks(x, z int) {
 	for i, ch := range p.gameMap.chunks {
 		if ch == nil {
 			continue
@@ -272,12 +273,12 @@ func (p *player) removeOldChunks(x, z int32) {
 	}
 }
 
-func (p *player) loadNewChunk(x, z int32, collection *mgo.Collection, mongoSession *mgo.Session) {
+func (p *player) loadNewChunk(x, z int, collection *mgo.Collection, mongoSession *mgo.Session) {
 	ch := Chunk{}
 	err := collection.Find(bson.M{"xpos": x, "zpos": z}).One(&ch)
 	if err != nil {
 		fmt.Printf("Creating Chunk at X %v Z %v\n", x, z)
-		genChunk(x, z, mongoSession)
+		p.gameMap.genChunk(x, z, mongoSession)
 		mongoSession.Fsync(false)
 		err = collection.Find(bson.M{"xpos": x, "zpos": z}).One(&ch)
 		if err != nil {
@@ -289,7 +290,7 @@ func (p *player) loadNewChunk(x, z int32, collection *mgo.Collection, mongoSessi
 
 }
 
-func checkForChunk(x, z int32, chunks []*Chunk) bool {
+func checkForChunk(x, z int, chunks []*Chunk) bool {
 	for _, ch := range chunks {
 		if ch == nil {
 			continue
@@ -320,18 +321,15 @@ func closeMongoSession() {
 
 type Chunk struct {
 	ID          bson.ObjectId `bson:"_id,omitempty"`
-	XPos, ZPos  int32
+	XPos, ZPos  int
 	fullyLoaded bool
-	cubes       []chunkCube
-}
-
-type chunkCube struct {
-	x, y, z, cubeType uint8
+	cubes       [chunkSize][maxHeight][chunkSize]uint8
 }
 
 func (c *Chunk) Update(cubes []Terrain.Cube) {
 	for _, cube := range cubes {
-		c.cubes = append(c.cubes, chunkCube{cube.XPos, cube.YPos, cube.ZPos, cube.GetCubeType()})
+		//fmt.Printf("CX %v CY %v X %v Y %v Z %v\n", c.XPos, c.ZPos, cube.XPos, cube.YPos, cube.ZPos)
+		c.cubes[int(cube.XPos)][int(cube.YPos)][int(cube.ZPos)] = cube.GetCubeType()
 	}
 }
 
@@ -347,20 +345,26 @@ func (c *Chunk) loadChunk(mongoSession *mgo.Session) {
 
 func (c *Chunk) getCubeArray(cubeType uint8) []float32 {
 	positions := []float32{}
-	for _, cube := range c.cubes {
-		if cube.cubeType == cubeType {
-			positions = append(positions, float32(int32(cube.x)+(c.XPos*int32(chunkSize))), float32(cube.y), float32(int32(cube.z)+(c.ZPos*int32(chunkSize))))
+	for x := 0; x < chunkSize; x++ {
+		for z := 0; z < chunkSize; z++ {
+			for y := 0; y < maxHeight; y++ {
+				if c.cubes[x][y][z] == cubeType {
+					positions = append(positions, float32(x+(c.XPos*chunkSize)), float32(y), float32(z+(c.ZPos*chunkSize)))
+				}
+			}
 		}
 	}
 	return positions
 }
 
 const (
-	chunkSize uint8 = 64
-	seaLevel  uint8 = 64
+	chunkSize  int   = 64
+	seaLevel   uint8 = 64
+	stoneLevel uint8 = 60
+	maxHeight  int   = 128
 )
 
-func genChunk(x, z int32, mongoSession *mgo.Session) {
+func (gameMap *level) genChunk(x, z int, mongoSession *mgo.Session) {
 	session := mongoSession.Copy()
 	defer session.Close()
 	collection := session.DB("GameDatabase").C("Chunks")
@@ -394,9 +398,9 @@ func genChunk(x, z int32, mongoSession *mgo.Session) {
 func genLayer(c *Chunk, y, cubeType uint8, collection *mgo.Collection, waitGroup *sync.WaitGroup) {
 	defer waitGroup.Done()
 	bulk := collection.Bulk()
-	for x := uint8(0); x < chunkSize; x++ {
-		for z := uint8(0); z < chunkSize; z++ {
-			bulk.Insert(Terrain.Cube{ChunkID: c.ID, XPos: x, YPos: y, ZPos: z, CubeType: cubeType})
+	for x := 0; x < chunkSize; x++ {
+		for z := 0; z < chunkSize; z++ {
+			bulk.Insert(Terrain.Cube{ChunkID: c.ID, XPos: uint8(x), YPos: y, ZPos: uint8(z), CubeType: cubeType})
 		}
 	}
 	_, err := bulk.Run()
@@ -418,6 +422,9 @@ func (gameMap *level) RenderLevel(vao, positionBuffer, textureBuffer uint32) {
 			continue
 		}
 		for _, gCube := range Terrain.GCubes {
+			if gCube.Gtype == 0 {
+				continue
+			}
 			positions := c.getCubeArray(gCube.Gtype)
 
 			if len(positions) == 0 {
