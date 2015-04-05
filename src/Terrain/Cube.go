@@ -44,16 +44,6 @@ func (cube *Cube) GetCubeType() uint8 {
 	return cube.CubeType
 }
 
-func (cube *Cube) CheckCollision(xPos, yPos, zPos uint8) bool {
-
-	if xPos == cube.XPos &&
-		yPos == cube.YPos &&
-		zPos == cube.ZPos {
-		return true
-	}
-	return false
-}
-
 var sky skyBox
 
 var GCubes = []GCube{
