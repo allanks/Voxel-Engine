@@ -103,7 +103,7 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	fmt.Println("Generating Player")
 
-	Player.GenPlayer(5, 70, 5)
+	Player.GenPlayer(5, 128, 5)
 
 	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 100.0)
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))

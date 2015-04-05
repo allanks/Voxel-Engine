@@ -5,7 +5,6 @@ import (
 	"log"
 	m "math"
 	"os"
-	"sync"
 
 	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"gopkg.in/mgo.v2"
@@ -16,8 +15,9 @@ const (
 	mongodb    string = "localhost:27017"
 	chunkSize  int    = 16
 	maxHeight  int    = 128
-	seaLevel   uint8  = 64
-	stoneLevel uint8  = 60
+	seaLevel   int    = 64
+	renderSize int    = 3
+	viewSize   int    = 32
 )
 
 var (
@@ -27,9 +27,8 @@ var (
 )
 
 type Level struct {
-	chunks       []*Chunk
-	seed         int64
-	defaultBlock []*Cube
+	chunks []*Chunk
+	noise  *simplexNoise
 }
 
 type Chunk struct {
@@ -108,7 +107,7 @@ func (gameMap *Level) RenderLevel(vao, positionBuffer, textureBuffer uint32) {
 
 }
 
-func (ch *Chunk) genChunk(mongoSession *mgo.Session) {
+func (gameMap *Level) genChunk(ch *Chunk) {
 	session := mongoSession.Copy()
 	defer session.Close()
 	collection := session.DB("GameDatabase").C("Chunks")
@@ -118,32 +117,45 @@ func (ch *Chunk) genChunk(mongoSession *mgo.Session) {
 	if err != nil {
 		log.Printf("RunQuery : ERROR : %s\n", err)
 	}
-	collection = session.DB("GameDatabase").C("Cubes")
 
+	for x := 0; x < chunkSize; x++ {
+		for z := 0; z < chunkSize; z++ {
+			gameMap.genColumn(ch, x, z)
+		}
+	}
+	go ch.persistChunk()
+}
+
+func (gameMap *Level) genColumn(ch *Chunk, x, z int) {
+	n := gameMap.noise.getNoise(float64(x), float64(z))
+	fmt.Printf("Calculated Perlin noise of %v\n", n)
+	h := int((n * 4) + 50)
 	var cubeType uint8
-	var waitGroup sync.WaitGroup
-	waitGroup.Add(int(seaLevel))
-	for yPos := uint8(0); yPos < seaLevel; yPos++ {
-		if (yPos + 1) >= seaLevel {
+	for y := 0; y < h; y++ {
+		if (y + 1) >= h {
 			cubeType = Grass
-		} else if (yPos + 5) >= seaLevel {
+		} else if (y + 5) >= h {
 			cubeType = Dirt
-		} else if (yPos + 10) >= seaLevel {
+		} else if (y + 10) >= h {
 			cubeType = Gravel
 		} else {
 			cubeType = Stone
 		}
-		go genLayer(ch, yPos, cubeType, collection, &waitGroup)
+		ch.cubes[x][y][z] = cubeType
 	}
-	waitGroup.Wait()
+
 }
 
-func genLayer(c *Chunk, y, cubeType uint8, collection *mgo.Collection, waitGroup *sync.WaitGroup) {
-	defer waitGroup.Done()
+func (ch *Chunk) persistChunk() {
+	session := mongoSession.Copy()
+	defer session.Close()
+	collection := session.DB("GameDatabase").C("Cubes")
 	bulk := collection.Bulk()
 	for x := 0; x < chunkSize; x++ {
 		for z := 0; z < chunkSize; z++ {
-			bulk.Insert(Cube{ChunkID: c.ID, XPos: uint8(x), YPos: y, ZPos: uint8(z), CubeType: cubeType})
+			for y := 0; y < maxHeight; y++ {
+				bulk.Insert(Cube{ChunkID: ch.ID, XPos: uint8(x), YPos: uint8(y), ZPos: uint8(z), CubeType: ch.cubes[x][y][z]})
+			}
 		}
 	}
 	_, err := bulk.Run()
@@ -157,7 +169,7 @@ func (gameMap *Level) removeOldChunks(x, z int) {
 		if ch == nil {
 			continue
 		}
-		if ch.XPos == (x-3) || ch.ZPos == (z-3) || ch.XPos == (x+3) || ch.ZPos == (z+3) {
+		if ch.XPos == (x-(renderSize+1)) || ch.ZPos == (z-(renderSize+1)) || ch.XPos == (x+(renderSize+1)) || ch.ZPos == (z+(renderSize+1)) {
 			copy(gameMap.chunks[i:], gameMap.chunks[i+1:])
 			gameMap.chunks[len(gameMap.chunks)-1] = nil
 			gameMap.chunks = gameMap.chunks[:len(gameMap.chunks)-1]
@@ -167,21 +179,18 @@ func (gameMap *Level) removeOldChunks(x, z int) {
 	}
 }
 
-func (ch *Chunk) loadNewChunk(x, z int) {
+func (gameMap *Level) loadNewChunk(ch *Chunk, x, z int) {
 	session := mongoSession.Copy()
 	defer session.Close()
 	collection := session.DB("GameDatabase").C("Chunks")
 	err := collection.Find(bson.M{"xpos": x, "zpos": z}).One(ch)
 	if err != nil {
 		fmt.Printf("Creating Chunk at X %v Z %v\n", x, z)
-		ch.genChunk(mongoSession)
+		gameMap.genChunk(ch)
 		mongoSession.Fsync(false)
-		err = collection.Find(bson.M{"xpos": x, "zpos": z}).One(ch)
-		if err != nil {
-			log.Fatalf("Could not create chunk: %s\n", err)
-		}
+	} else {
+		ch.loadChunk(mongoSession)
 	}
-	ch.loadChunk(mongoSession)
 }
 
 func (c *Chunk) loadChunk(mongoSession *mgo.Session) {
@@ -215,13 +224,14 @@ func (gameMap *Level) LoadGameMap(pX, pZ float64) {
 	if mongoSession == nil {
 		createDatabaseLink()
 	}
+	gameMap.noise = createSimplexNoise(100, 10.0, 0.1)
 	x := int(m.Floor(pX / float64(chunkSize)))
 	z := int(m.Floor(pZ / float64(chunkSize)))
 	ch := Chunk{}
 	ch.XPos = x
 	ch.ZPos = z
 	gameMap.chunks = append(gameMap.chunks, &ch)
-	ch.loadNewChunk(x, z)
+	gameMap.loadNewChunk(&ch, x, z)
 }
 
 func (gameMap *Level) initChunk(x, z int) {
@@ -230,7 +240,7 @@ func (gameMap *Level) initChunk(x, z int) {
 	ch.ZPos = z
 	gameMap.chunks = append(gameMap.chunks, &ch)
 
-	ch.loadNewChunk(x, z)
+	gameMap.loadNewChunk(&ch, x, z)
 }
 
 func (gameMap *Level) LoopChunkLoader(pX, pZ float64) {
@@ -238,44 +248,12 @@ func (gameMap *Level) LoopChunkLoader(pX, pZ float64) {
 	x := int(m.Floor(pX / float64(chunkSize)))
 	z := int(m.Floor(pZ / float64(chunkSize)))
 	gameMap.removeOldChunks(x, z)
-	if !gameMap.checkForChunk(x, z) {
-		gameMap.initChunk(x, z)
-	}
-	if !gameMap.checkForChunk(x+1, z) {
-		gameMap.initChunk(x+1, z)
-	}
-	if !gameMap.checkForChunk(x-1, z) {
-		gameMap.initChunk(x-1, z)
-	}
-	if !gameMap.checkForChunk(x, z+1) {
-		gameMap.initChunk(x, z+1)
-	}
-	if !gameMap.checkForChunk(x, z-1) {
-		gameMap.initChunk(x, z-1)
-	}
-	if !gameMap.checkForChunk(x+2, z) {
-		gameMap.initChunk(x+2, z)
-	}
-	if !gameMap.checkForChunk(x-2, z) {
-		gameMap.initChunk(x-2, z)
-	}
-	if !gameMap.checkForChunk(x, z+2) {
-		gameMap.initChunk(x, z+2)
-	}
-	if !gameMap.checkForChunk(x, z-2) {
-		gameMap.initChunk(x, z-2)
-	}
-	if !gameMap.checkForChunk(x+1, z+1) {
-		gameMap.initChunk(x+1, z+1)
-	}
-	if !gameMap.checkForChunk(x+1, z-1) {
-		gameMap.initChunk(x+1, z-1)
-	}
-	if !gameMap.checkForChunk(x-1, z+1) {
-		gameMap.initChunk(x-1, z+1)
-	}
-	if !gameMap.checkForChunk(x-1, z-1) {
-		gameMap.initChunk(x-1, z-1)
+	for i := x - renderSize; i < x+renderSize; i++ {
+		for j := z - renderSize; j < z+renderSize; j++ {
+			if !gameMap.checkForChunk(i, j) {
+				gameMap.initChunk(i, j)
+			}
+		}
 	}
 }
 
