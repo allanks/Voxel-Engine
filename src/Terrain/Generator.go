@@ -225,7 +225,7 @@ func (gameMap *Level) LoadGameMap(pX, pZ float64) {
 	if mongoSession == nil {
 		createDatabaseLink()
 	}
-	gameMap.noise = createSimplexNoise(200, 255.0, 1)
+	gameMap.noise = createSimplexNoise(200, 255.0, 0.5)
 	x := int(m.Floor(pX / float64(chunkSize)))
 	z := int(m.Floor(pZ / float64(chunkSize)))
 	ch := Chunk{}

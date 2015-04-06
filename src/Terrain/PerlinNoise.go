@@ -105,60 +105,63 @@ func initNoise(seed int64) noise {
 	return n
 }
 
-func (n *noise) generateNoise(x, z float64) float64 {
-	skew := 0.5 * (m.Sqrt(3) - 1)
-	fac := (x + z) * skew
-	i := m.Floor(x + fac)
-	j := m.Floor(z + fac)
+func (n *noise) generateNoise(xin, yin float64) float64 {
+	F2 := 0.5 * (m.Sqrt(3) - 1)
+	s := (xin + yin) * F2
+	i := fastFloor(xin + s)
+	j := fastFloor(yin + s)
 
-	unSkew := (3.0 - m.Sqrt(3.0)) / 6.0
-	t := (i + j) * unSkew
-	x0 := x - i + t
-	z0 := z - i + t
-	var tri int
-	if x0 > z0 {
-		tri = 1
+	G2 := (3.0 - m.Sqrt(3.0)) / 6.0
+	t := float64(i+j) * G2
+	X0 := float64(i) - t
+	Y0 := float64(j) - t
+	x0 := xin - X0
+	y0 := yin - Y0
+	var i1, j1 int
+	if x0 > y0 {
+		i1 = 1
+		j1 = 0
 	} else {
-		tri = 0
+		i1 = 0
+		j1 = 1
 	}
-	trj := 1 - tri
 
-	x1 := x0 - float64(tri) + unSkew
-	z1 := z0 - float64(trj) + unSkew
-	x2 := x0 - 1 + (2 * unSkew)
-	z2 := z0 - 1 + (2 * unSkew)
+	x1 := x0 - float64(i1) + G2
+	y1 := y0 - float64(j1) + G2
+	x2 := x0 - 1 + (2 * G2)
+	y2 := y0 - 1 + (2 * G2)
 
-	ii := int(i) & 255
-	jj := int(j) & 255
-	gi0 := n.permMod12[ii+n.perm[jj]] % 12
-	gi1 := n.permMod12[ii+tri+n.perm[jj+trj]] % 12
-	gi2 := n.permMod12[ii+1+n.perm[jj+1]] % 12
+	ii := i & 255
+	jj := j & 255
+	gi0 := n.perm[ii+n.perm[jj]] % 12
+	gi1 := n.perm[ii+i1+n.perm[jj+j1]] % 12
+	gi2 := n.perm[ii+1+n.perm[jj+1]] % 12
 
-	t0 := 0.5 - (x0 * x0) - (z0 * z0)
+	t0 := 0.5 - (x0 * x0) - (y0 * y0)
 	var n0 float64
 	if t0 < 0 {
 		n0 = 0.0
 	} else {
 		t0 = t0 * t0
-		n0 = t0 * t0 * dot(grad3[gi0], x0, z0)
+		n0 = t0 * t0 * dot(grad3[gi0], x0, y0)
 	}
 
-	t1 := 0.5 - (x1 * x1) - (z1 * z1)
+	t1 := 0.5 - (x1 * x1) - (y1 * y1)
 	var n1 float64
 	if t1 < 0 {
 		n1 = 0.0
 	} else {
 		t1 = t1 * t1
-		n1 = t1 * t1 * dot(grad3[gi1], x1, z1)
+		n1 = t1 * t1 * dot(grad3[gi1], x1, y1)
 	}
 
-	t2 := 0.5 - x2*x2 - z2*z2
+	t2 := 0.5 - x2*x2 - y2*y2
 	var n2 float64
 	if t2 < 0 {
 		n2 = 0.0
 	} else {
 		t2 = t2 * t2
-		n2 = t2 * t2 * dot(grad3[gi2], x2, z2)
+		n2 = t2 * t2 * dot(grad3[gi2], x2, y2)
 	}
 
 	return 70.0 * (n0 + n1 + n2)
@@ -166,4 +169,12 @@ func (n *noise) generateNoise(x, z float64) float64 {
 
 func dot(g []int, x, y float64) float64 {
 	return float64(g[0])*x + float64(g[1])*y
+}
+
+func fastFloor(x float64) int {
+	if x > 0 {
+		return int(x)
+	} else {
+		return int(x - 1)
+	}
 }
