@@ -127,9 +127,10 @@ func (gameMap *Level) genChunk(ch *Chunk) {
 }
 
 func (gameMap *Level) genColumn(ch *Chunk, x, z int) {
-	n := gameMap.noise.getNoise(float64(x), float64(z))
-	fmt.Printf("Calculated Perlin noise of %v\n", n)
-	h := int((n * 4) + 50)
+	n := (gameMap.noise.getNoise(float64((ch.XPos*chunkSize)+x), float64((ch.ZPos*chunkSize)+z)) + 1.0) / 2.0
+	h := int((n * 4) + 60)
+	//fmt.Printf("Got a Noise of %v\n", n)
+
 	var cubeType uint8
 	for y := 0; y < h; y++ {
 		if (y + 1) >= h {
@@ -224,7 +225,7 @@ func (gameMap *Level) LoadGameMap(pX, pZ float64) {
 	if mongoSession == nil {
 		createDatabaseLink()
 	}
-	gameMap.noise = createSimplexNoise(100, 10.0, 0.1)
+	gameMap.noise = createSimplexNoise(200, 255.0, 1)
 	x := int(m.Floor(pX / float64(chunkSize)))
 	z := int(m.Floor(pZ / float64(chunkSize)))
 	ch := Chunk{}

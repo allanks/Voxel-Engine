@@ -216,22 +216,39 @@ func InitGCubes() {
 	GCubes[CobbleStone].Gtype = CobbleStone
 	GCubes[Gravel].Gtype = Gravel
 
-	GCubes[Dirt].Texture = loadTexCoords(2, 1)
-	GCubes[Grass].Texture = loadTexCoords(2, 2)
-	GCubes[Stone].Texture = loadTexCoords(1, 3)
-	GCubes[CobbleStone].Texture = loadTexCoords(2, 0)
-	GCubes[Gravel].Texture = loadTexCoords(0, 3)
+	GCubes[Dirt].Texture = loadTexCoords(2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1)
+	GCubes[Grass].Texture = loadTexCoords(2, 1, 2, 1, 2, 1, 2, 1, 2, 2, 2, 1)
+	GCubes[Stone].Texture = loadTexCoords(1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3)
+	GCubes[CobbleStone].Texture = loadTexCoords(2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0)
+	GCubes[Gravel].Texture = loadTexCoords(0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3)
 }
 
-func loadTexCoords(u, v float32) []float32 {
-	tex := []float32{}
-	for i := 0; i < 6; i++ {
-		tex = append(tex,
-			u, v, // 1
-			u, v+1, // 2
-			u+1, v, // 3
-			u+1, v+1, // 4
-		)
+func loadTexCoords(u1, v1, u2, v2, u3, v3, u4, v4, u5, v5, u6, v6 float32) []float32 {
+	tex := []float32{
+		u1, v1,
+		u1, v1 + 1,
+		u1 + 1, v1,
+		u1 + 1, v1 + 1,
+		u2, v2,
+		u2, v2 + 1,
+		u2 + 1, v2,
+		u2 + 1, v2 + 1,
+		u3, v3,
+		u3, v3 + 1,
+		u3 + 1, v3,
+		u3 + 1, v3 + 1,
+		u4, v4,
+		u4, v4 + 1,
+		u4 + 1, v4,
+		u4 + 1, v4 + 1,
+		u5, v5,
+		u5, v5 + 1,
+		u5 + 1, v5,
+		u5 + 1, v5 + 1,
+		u6, v6,
+		u6, v6 + 1,
+		u6 + 1, v6,
+		u6 + 1, v6 + 1,
 	}
 	return tex
 }
