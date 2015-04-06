@@ -276,6 +276,12 @@ func createDatabaseLink() {
 	if err != nil {
 		log.Fatalf("CreateSession: %s\n", err)
 	}
+	index := mgo.Index{
+		Key: []string{"chunkid"},
+	}
+	collection := mongoSession.DB("GameDatabase").C("Cubes")
+	collection.EnsureIndex(index)
+
 }
 func closeMongoSession() {
 	logFile.Close()

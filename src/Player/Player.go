@@ -173,7 +173,7 @@ func OnKey(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw
 			user.fall = jumpSpeed
 		}
 	case glfw.KeyP:
-		fmt.Printf("%v%v\n", "Player ", user)
+		fmt.Printf("Player X %v, Y %v, Z %v\n", int(m.Floor(user.xPos)), int(m.Floor(user.yPos)), int(m.Floor(user.zPos)))
 	}
 }
 
