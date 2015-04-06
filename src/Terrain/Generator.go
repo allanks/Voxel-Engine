@@ -16,7 +16,7 @@ const (
 	chunkSize  int    = 16
 	maxHeight  int    = 128
 	seaLevel   int    = 64
-	renderSize int    = 3
+	renderSize int    = 8
 	viewSize   int    = 32
 )
 
@@ -67,13 +67,18 @@ func (gameMap *Level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool
 	return false
 }
 
-func (gameMap *Level) RenderLevel(vao, positionBuffer, textureBuffer uint32) {
+func (gameMap *Level) RenderLevel(pX, pZ int, vao, positionBuffer, textureBuffer uint32) {
 
 	gl.BindVertexArray(vao)
-
+	var level int
 	for _, c := range gameMap.chunks {
 		if c == nil || len(c.cubes) == 0 {
 			continue
+		}
+		if pX <= (c.XPos+1)*chunkSize && pX >= c.XPos*chunkSize && pZ <= (c.ZPos+1)*chunkSize && pZ >= c.ZPos*chunkSize {
+			level = seaLevel
+		} else {
+			level = 0
 		}
 		for _, gCube := range GCubes {
 			if gCube.Gtype == 0 {
@@ -82,7 +87,7 @@ func (gameMap *Level) RenderLevel(vao, positionBuffer, textureBuffer uint32) {
 			positions := []float32{}
 			for x := 0; x < chunkSize; x++ {
 				for z := 0; z < chunkSize; z++ {
-					for y := 0; y < maxHeight; y++ {
+					for y := level; y < maxHeight; y++ {
 						if c.cubes[x][y][z] == gCube.Gtype {
 							positions = append(positions, float32(x+(c.XPos*chunkSize)), float32(y), float32(z+(c.ZPos*chunkSize)))
 						}
@@ -249,10 +254,12 @@ func (gameMap *Level) LoopChunkLoader(pX, pZ float64) {
 	x := int(m.Floor(pX / float64(chunkSize)))
 	z := int(m.Floor(pZ / float64(chunkSize)))
 	gameMap.removeOldChunks(x, z)
-	for i := x - renderSize; i < x+renderSize; i++ {
-		for j := z - renderSize; j < z+renderSize; j++ {
-			if !gameMap.checkForChunk(i, j) {
-				gameMap.initChunk(i, j)
+	for c := 1; c < renderSize; c++ {
+		for i := x - c; i < x+c; i++ {
+			for j := z - c; j < z+c; j++ {
+				if !gameMap.checkForChunk(i, j) {
+					gameMap.initChunk(i, j)
+				}
 			}
 		}
 	}

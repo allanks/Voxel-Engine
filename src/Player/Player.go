@@ -185,5 +185,5 @@ func (p *player) loopChunkLoader() {
 }
 
 func Render(vao, positionBuffer, textureBuffer uint32) {
-	user.gameMap.RenderLevel(vao, positionBuffer, textureBuffer)
+	user.gameMap.RenderLevel(int(user.xPos), int(user.yPos), vao, positionBuffer, textureBuffer)
 }
