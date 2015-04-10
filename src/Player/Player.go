@@ -173,7 +173,7 @@ func OnKey(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw
 			user.fall = jumpSpeed
 		}
 	case glfw.KeyP:
-		fmt.Printf("Player X %v, Y %v, Z %v\n", int(m.Floor(user.xPos)), int(m.Floor(user.yPos)), int(m.Floor(user.zPos)))
+		fmt.Printf("Player X %v, Y %v, Z %v Free %v\nIsInCube %v\n", int(m.Floor(user.xPos)), int(m.Floor(user.yPos)), int(m.Floor(user.zPos)), user.freeMovement, user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance))
 	}
 }
 
@@ -184,6 +184,6 @@ func (p *player) loopChunkLoader() {
 	}
 }
 
-func Render(vao, positionBuffer, textureBuffer uint32) {
-	user.gameMap.RenderLevel(int(user.xPos), int(user.yPos), vao, positionBuffer, textureBuffer)
+func Render(vao, typeBuffer uint32, chunkPosition int32) {
+	user.gameMap.RenderLevel(vao, typeBuffer, chunkPosition)
 }

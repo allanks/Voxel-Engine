@@ -35,7 +35,7 @@ type Chunk struct {
 	ID          bson.ObjectId `bson:"_id,omitempty"`
 	XPos, ZPos  int
 	fullyLoaded bool
-	cubes       [chunkSize][maxHeight][chunkSize]uint8
+	cubes       [chunkSize * chunkSize][maxHeight]float32
 }
 
 func (gameMap *Level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool {
@@ -56,10 +56,10 @@ func (gameMap *Level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool
 			continue
 		}
 		if pX <= (c.XPos+1)*chunkSize && pX >= c.XPos*chunkSize && pZ <= (c.ZPos+1)*chunkSize && pZ >= c.ZPos*chunkSize {
-			if c.cubes[pXpC][pY][pZpC] != Empty ||
-				c.cubes[pXpC][pY][pZmC] != Empty ||
-				c.cubes[pXmC][pY][pZpC] != Empty ||
-				c.cubes[pXmC][pY][pZmC] != Empty {
+			if c.cubes[pXpC*chunkSize+pZpC][pY] != Empty ||
+				c.cubes[pXpC*chunkSize+pZmC][pY] != Empty ||
+				c.cubes[pXmC*chunkSize+pZpC][pY] != Empty ||
+				c.cubes[pXmC*chunkSize+pZmC][pY] != Empty {
 				return true
 			}
 		}
@@ -67,49 +67,26 @@ func (gameMap *Level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool
 	return false
 }
 
-func (gameMap *Level) RenderLevel(pX, pZ int, vao, positionBuffer, textureBuffer uint32) {
+func (gameMap *Level) RenderLevel(vao, typeBuffer uint32, chunkPosition int32) {
 
 	gl.BindVertexArray(vao)
-	var level int
 	for _, c := range gameMap.chunks {
-		if c == nil || len(c.cubes) == 0 {
+		if c == nil {
 			continue
 		}
-		if pX <= (c.XPos+1)*chunkSize && pX >= c.XPos*chunkSize && pZ <= (c.ZPos+1)*chunkSize && pZ >= c.ZPos*chunkSize {
-			level = seaLevel
-		} else {
-			level = 0
-		}
-		for _, gCube := range GCubes {
-			if gCube.Gtype == 0 {
-				continue
+		for x := 0; x < chunkSize; x++ {
+			for z := 0; z < chunkSize; z++ {
+				gl.Uniform2f(chunkPosition, float32((c.XPos*chunkSize)+x), float32((c.ZPos*chunkSize)+z))
+
+				slice := c.cubes[x*chunkSize+z][:]
+
+				gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
+				gl.BufferData(gl.ARRAY_BUFFER, len(slice)*4, gl.Ptr(slice), gl.STATIC_DRAW)
+
+				gl.DrawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_INT, gl.Ptr(nil), int32(maxHeight))
 			}
-			positions := []float32{}
-			for x := 0; x < chunkSize; x++ {
-				for z := 0; z < chunkSize; z++ {
-					for y := level; y < maxHeight; y++ {
-						if c.cubes[x][y][z] == gCube.Gtype {
-							positions = append(positions, float32(x+(c.XPos*chunkSize)), float32(y), float32(z+(c.ZPos*chunkSize)))
-						}
-					}
-				}
-			}
-
-			if len(positions) == 0 {
-				continue
-			}
-
-			gl.BindBuffer(gl.ARRAY_BUFFER, textureBuffer)
-			gl.BufferData(gl.ARRAY_BUFFER, len(gCube.Texture)*4, gl.Ptr(gCube.Texture), gl.STATIC_DRAW)
-
-			gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
-			gl.BufferData(gl.ARRAY_BUFFER, len(positions)*4, gl.Ptr(positions), gl.STATIC_DRAW)
-
-			instances := int32(len(positions) / 3)
-			gl.DrawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_INT, gl.Ptr(nil), int32(instances))
 		}
 	}
-
 }
 
 func (gameMap *Level) genChunk(ch *Chunk) {
@@ -147,7 +124,7 @@ func (gameMap *Level) genColumn(ch *Chunk, x, z int) {
 		} else {
 			cubeType = Stone
 		}
-		ch.cubes[x][y][z] = cubeType
+		ch.cubes[x*chunkSize+z][y] = float32(cubeType)
 	}
 
 }
@@ -160,7 +137,7 @@ func (ch *Chunk) persistChunk() {
 	for x := 0; x < chunkSize; x++ {
 		for z := 0; z < chunkSize; z++ {
 			for y := 0; y < maxHeight; y++ {
-				bulk.Insert(Cube{ChunkID: ch.ID, XPos: uint8(x), YPos: uint8(y), ZPos: uint8(z), CubeType: ch.cubes[x][y][z]})
+				bulk.Insert(Cube{ChunkID: ch.ID, XPos: uint8(x), YPos: uint8(y), ZPos: uint8(z), CubeType: uint8(ch.cubes[x*chunkSize+z][y])})
 			}
 		}
 	}
@@ -206,11 +183,12 @@ func (c *Chunk) loadChunk(mongoSession *mgo.Session) {
 	collection.Find(bson.M{"chunkid": c.ID}).All(&cubeLoader)
 	c.Update(cubeLoader)
 	c.fullyLoaded = true
+	//fmt.Printf("Cubes: %v\n", c.cubes[:])
 }
 
 func (c *Chunk) Update(cubes []Cube) {
 	for _, cube := range cubes {
-		c.cubes[int(cube.XPos)][int(cube.YPos)][int(cube.ZPos)] = cube.GetCubeType()
+		c.cubes[int(cube.XPos)*chunkSize+int(cube.ZPos)][int(cube.YPos)] = float32(cube.GetCubeType())
 	}
 }
 

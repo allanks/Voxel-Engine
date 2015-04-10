@@ -57,32 +57,42 @@ var GCubes = []GCube{
 
 var instances int32
 
-func InitialiseGCubeBuffers() (uint32, uint32, uint32) {
-	var vao, positionBuffer uint32
+func InitialiseGCubeBuffers(textureBuffer uint32) (uint32, uint32) {
+	var vao uint32
 	gl.GenVertexArrays(1, &vao)
 	gl.BindVertexArray(vao)
 
-	var vertexBuffer, textureBuffer, indexBuffer uint32
+	var vertexBuffer, typeBuffer, indexBuffer uint32
 	gl.GenBuffers(1, &vertexBuffer)
 	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, len(cubeVertices)*4, gl.Ptr(cubeVertices), gl.STATIC_DRAW)
 	gl.EnableVertexAttribArray(0)
 	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
 
-	gl.GenBuffers(1, &textureBuffer)
-	gl.BindBuffer(gl.ARRAY_BUFFER, textureBuffer)
+	gl.GenBuffers(1, &typeBuffer)
+	gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
 	gl.EnableVertexAttribArray(1)
-	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 0, gl.PtrOffset(0))
-
-	gl.GenBuffers(1, &positionBuffer)
-	gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
-	gl.EnableVertexAttribArray(2)
-	gl.VertexAttribPointer(2, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
-	gl.VertexAttribDivisor(2, 1)
+	gl.VertexAttribPointer(1, 1, gl.FLOAT, false, 0, gl.PtrOffset(0))
+	gl.VertexAttribDivisor(1, 1)
 
 	gl.GenBuffers(1, &indexBuffer)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(CubeElements)*4, gl.Ptr(CubeElements), gl.STATIC_DRAW)
+
+	buffer := []float32{}
+	for i := 0; i < 48; i++ {
+		buffer = append(buffer, 0)
+	}
+
+	for _, gCube := range GCubes {
+		if gCube.Gtype == 0 {
+			continue
+		}
+		buffer = append(buffer, gCube.Texture...)
+	}
+	gl.GenBuffers(1, &textureBuffer)
+	gl.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0, textureBuffer)
+	gl.BufferData(gl.SHADER_STORAGE_BUFFER, len(buffer)*4, gl.Ptr(buffer), gl.STATIC_DRAW)
 
 	texture, err := Graphics.NewTexture(textureAtlas)
 	if err != nil {
@@ -94,20 +104,13 @@ func InitialiseGCubeBuffers() (uint32, uint32, uint32) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 
-	return vao, positionBuffer, textureBuffer
+	return vao, typeBuffer
 }
 
-func RenderSkyBox(vao, positionBuffer, textureBuffer uint32, x, y, z float64) {
-	position := []float32{float32(x) - 0.5, float32(y) - 0.5, float32(z) - 0.5}
+func RenderSkyBox(vao uint32, x, y, z float64) {
 	gl.DepthMask(false)
 
 	gl.BindVertexArray(vao)
-
-	gl.BindBuffer(gl.ARRAY_BUFFER, textureBuffer)
-	gl.BufferData(gl.ARRAY_BUFFER, len(sky.texture)*4, gl.Ptr(sky.texture), gl.STATIC_DRAW)
-
-	gl.BindBuffer(gl.ARRAY_BUFFER, positionBuffer)
-	gl.BufferData(gl.ARRAY_BUFFER, len(position)*4, gl.Ptr(position), gl.STATIC_DRAW)
 
 	gl.DrawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_INT, gl.Ptr(nil), int32(1))
 
