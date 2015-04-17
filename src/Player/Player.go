@@ -38,7 +38,7 @@ type moveFunc func(float64)
 
 func GenPlayer(xPos, yPos, zPos float64) {
 	lastFrameTime = glfw.GetTime()
-	user = player{xPos, yPos, zPos, -180.0, 0.0, 0.0, false, true, &Terrain.Level{}}
+	user = player{xPos, yPos, zPos, -180.0, 0.0, 0.0, true, true, &Terrain.Level{}}
 	user.gameMap.LoadGameMap(xPos, zPos)
 	go user.loopChunkLoader()
 }
@@ -184,6 +184,6 @@ func (p *player) loopChunkLoader() {
 	}
 }
 
-func Render(vao, typeBuffer uint32, chunkPosition int32) {
-	user.gameMap.RenderLevel(vao, typeBuffer, chunkPosition)
+func Render(vao, typeBuffer uint32) {
+	user.gameMap.RenderLevel(vao, typeBuffer)
 }

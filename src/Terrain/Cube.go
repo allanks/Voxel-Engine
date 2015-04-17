@@ -18,6 +18,7 @@ const (
 const (
 	// Cube Types
 	Empty = iota
+	SkyBox
 	Dirt
 	Grass
 	Stone
@@ -53,6 +54,7 @@ var GCubes = []GCube{
 	GCube{},
 	GCube{},
 	GCube{},
+	GCube{},
 }
 
 var instances int32
@@ -72,7 +74,7 @@ func InitialiseGCubeBuffers(textureBuffer uint32) (uint32, uint32) {
 	gl.GenBuffers(1, &typeBuffer)
 	gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
 	gl.EnableVertexAttribArray(1)
-	gl.VertexAttribPointer(1, 1, gl.FLOAT, false, 0, gl.PtrOffset(0))
+	gl.VertexAttribPointer(1, 4, gl.FLOAT, false, 0, gl.PtrOffset(0))
 	gl.VertexAttribDivisor(1, 1)
 
 	gl.GenBuffers(1, &indexBuffer)
@@ -83,6 +85,8 @@ func InitialiseGCubeBuffers(textureBuffer uint32) (uint32, uint32) {
 	for i := 0; i < 48; i++ {
 		buffer = append(buffer, 0)
 	}
+
+	buffer = append(buffer, sky.texture...)
 
 	for _, gCube := range GCubes {
 		if gCube.Gtype == 0 {
@@ -107,10 +111,14 @@ func InitialiseGCubeBuffers(textureBuffer uint32) (uint32, uint32) {
 	return vao, typeBuffer
 }
 
-func RenderSkyBox(vao uint32, x, y, z float64) {
+func RenderSkyBox(vao, typeBuffer uint32, x, y, z float64) {
 	gl.DepthMask(false)
 
 	gl.BindVertexArray(vao)
+
+	position := []float32{float32(x) - 0.5, float32(y) - 0.5, float32(z) - 0.5, 1}
+	gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, 16, gl.Ptr(position), gl.STATIC_DRAW)
 
 	gl.DrawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_INT, gl.Ptr(nil), int32(1))
 

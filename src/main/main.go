@@ -116,7 +116,6 @@ func initOpenGLProgram(window *glfw.Window) {
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
 	textureDataStorageBlock := gl.GetProgramResourceIndex(program, gl.SHADER_STORAGE_BLOCK, gl.Str("texture_data\x00"))
-	chunkPosition := gl.GetUniformLocation(program, gl.Str("chunk\x00"))
 
 	fmt.Println("Initialising Buffers")
 
@@ -134,9 +133,9 @@ func initOpenGLProgram(window *glfw.Window) {
 
 		camera := Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
-		//x, y, z := Player.GetPosition()
-		//Terrain.RenderSkyBox(vao, x, y, z)
-		Player.Render(vao, typeBuffer, chunkPosition)
+		x, y, z := Player.GetPosition()
+		Terrain.RenderSkyBox(vao, typeBuffer, x, y, z)
+		Player.Render(vao, typeBuffer)
 
 		Player.MovePlayer(window)
 
@@ -155,23 +154,21 @@ var vertexShader string = `
 
 uniform mat4 projection;
 uniform mat4 camera;
-uniform vec2 chunk;
 
 layout(std430,binding=0) buffer texture_data {
 	vec2 textureData[];
 }texData;
 
 layout(location=0) in vec3 vert; // cube vertex position
-layout(location=1) in float type; // instance data, unique to each object (instance)
+layout(location=1) in vec4 cube; // instance data, unique to each object (instance)
 
 in int gl_VertexID;
-in int gl_InstanceID;
 
 out vec2 fragTexCoord;
 
 void main() {
-    fragTexCoord =  texData.textureData[gl_VertexID+(int(type)*24)];
-    gl_Position = projection * camera *  (vec4( vert + vec3(chunk.x, gl_InstanceID, chunk.y), 1));
+    fragTexCoord =  texData.textureData[gl_VertexID+(int(cube.w)*24)];
+    gl_Position = projection * camera *  (vec4( vert + vec3(cube.x, cube.y, cube.z), 1));
 }
 ` + "\x00"
 

@@ -35,7 +35,8 @@ type Chunk struct {
 	ID          bson.ObjectId `bson:"_id,omitempty"`
 	XPos, ZPos  int
 	fullyLoaded bool
-	cubes       [chunkSize * chunkSize][maxHeight]float32
+	cubes       [chunkSize][maxHeight][chunkSize]float32
+	drawables   []float32
 }
 
 func (gameMap *Level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool {
@@ -56,10 +57,10 @@ func (gameMap *Level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool
 			continue
 		}
 		if pX <= (c.XPos+1)*chunkSize && pX >= c.XPos*chunkSize && pZ <= (c.ZPos+1)*chunkSize && pZ >= c.ZPos*chunkSize {
-			if c.cubes[pXpC*chunkSize+pZpC][pY] != Empty ||
-				c.cubes[pXpC*chunkSize+pZmC][pY] != Empty ||
-				c.cubes[pXmC*chunkSize+pZpC][pY] != Empty ||
-				c.cubes[pXmC*chunkSize+pZmC][pY] != Empty {
+			if c.cubes[pXpC][pY][pZpC] != Empty ||
+				c.cubes[pXpC][pY][pZmC] != Empty ||
+				c.cubes[pXmC][pY][pZpC] != Empty ||
+				c.cubes[pXmC][pY][pZmC] != Empty {
 				return true
 			}
 		}
@@ -67,25 +68,18 @@ func (gameMap *Level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool
 	return false
 }
 
-func (gameMap *Level) RenderLevel(vao, typeBuffer uint32, chunkPosition int32) {
+func (gameMap *Level) RenderLevel(vao, typeBuffer uint32) {
 
 	gl.BindVertexArray(vao)
 	for _, c := range gameMap.chunks {
-		if c == nil {
+		if c == nil || len(c.drawables) == 0 {
 			continue
 		}
-		for x := 0; x < chunkSize; x++ {
-			for z := 0; z < chunkSize; z++ {
-				gl.Uniform2f(chunkPosition, float32((c.XPos*chunkSize)+x), float32((c.ZPos*chunkSize)+z))
 
-				slice := c.cubes[x*chunkSize+z][:]
+		gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
+		gl.BufferData(gl.ARRAY_BUFFER, len(c.drawables)*4, gl.Ptr(c.drawables), gl.STATIC_DRAW)
 
-				gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
-				gl.BufferData(gl.ARRAY_BUFFER, len(slice)*4, gl.Ptr(slice), gl.STATIC_DRAW)
-
-				gl.DrawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_INT, gl.Ptr(nil), int32(maxHeight))
-			}
-		}
+		gl.DrawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_INT, gl.Ptr(nil), int32(len(c.drawables)/4))
 	}
 }
 
@@ -124,7 +118,7 @@ func (gameMap *Level) genColumn(ch *Chunk, x, z int) {
 		} else {
 			cubeType = Stone
 		}
-		ch.cubes[x*chunkSize+z][y] = float32(cubeType)
+		ch.cubes[x][y][z] = float32(cubeType)
 	}
 
 }
@@ -137,7 +131,7 @@ func (ch *Chunk) persistChunk() {
 	for x := 0; x < chunkSize; x++ {
 		for z := 0; z < chunkSize; z++ {
 			for y := 0; y < maxHeight; y++ {
-				bulk.Insert(Cube{ChunkID: ch.ID, XPos: uint8(x), YPos: uint8(y), ZPos: uint8(z), CubeType: uint8(ch.cubes[x*chunkSize+z][y])})
+				bulk.Insert(Cube{ChunkID: ch.ID, XPos: uint8(x), YPos: uint8(y), ZPos: uint8(z), CubeType: uint8(ch.cubes[x][y][z])})
 			}
 		}
 	}
@@ -162,17 +156,28 @@ func (gameMap *Level) removeOldChunks(x, z int) {
 	}
 }
 
-func (gameMap *Level) loadNewChunk(ch *Chunk, x, z int) {
+func (gameMap *Level) loadNewChunk(c *Chunk, x, z int) {
 	session := mongoSession.Copy()
 	defer session.Close()
 	collection := session.DB("GameDatabase").C("Chunks")
-	err := collection.Find(bson.M{"xpos": x, "zpos": z}).One(ch)
+	err := collection.Find(bson.M{"xpos": x, "zpos": z}).One(c)
 	if err != nil {
 		fmt.Printf("Creating Chunk at X %v Z %v\n", x, z)
-		gameMap.genChunk(ch)
+		gameMap.genChunk(c)
 		mongoSession.Fsync(false)
+		gameMap.Update(c)
 	} else {
-		ch.loadChunk(mongoSession)
+		c.loadChunk(mongoSession)
+		gameMap.Update(c)
+		for _, chunk := range gameMap.chunks {
+			if (chunk.XPos == c.XPos+1 && chunk.ZPos == c.ZPos) ||
+				(chunk.XPos == c.XPos-1 && chunk.ZPos == c.ZPos) ||
+				(chunk.XPos == c.XPos && chunk.ZPos == c.ZPos+1) ||
+				(chunk.XPos == c.XPos && chunk.ZPos == c.ZPos-1) {
+				// Reload neighbours
+				gameMap.Update(c)
+			}
+		}
 	}
 }
 
@@ -181,14 +186,52 @@ func (c *Chunk) loadChunk(mongoSession *mgo.Session) {
 	defer session.Close()
 	collection := session.DB("GameDatabase").C("Cubes")
 	collection.Find(bson.M{"chunkid": c.ID}).All(&cubeLoader)
-	c.Update(cubeLoader)
+	for _, cube := range cubeLoader {
+		c.cubes[int(cube.XPos)][int(cube.YPos)][int(cube.ZPos)] = float32(cube.GetCubeType())
+	}
 	c.fullyLoaded = true
-	//fmt.Printf("Cubes: %v\n", c.cubes[:])
 }
 
-func (c *Chunk) Update(cubes []Cube) {
-	for _, cube := range cubes {
-		c.cubes[int(cube.XPos)*chunkSize+int(cube.ZPos)][int(cube.YPos)] = float32(cube.GetCubeType())
+func (gameMap *Level) Update(c *Chunk) {
+	var left, right, front, back *Chunk
+	for _, chunk := range gameMap.chunks {
+		if chunk.XPos == c.XPos+1 && chunk.ZPos == c.ZPos {
+			right = chunk
+		}
+		if chunk.XPos == c.XPos-1 && chunk.ZPos == c.ZPos {
+			left = chunk
+		}
+		if chunk.XPos == c.XPos && chunk.ZPos == c.ZPos+1 {
+			front = chunk
+		}
+		if chunk.XPos == c.XPos && chunk.ZPos == c.ZPos-1 {
+			back = chunk
+		}
+	}
+	c.drawables = make([]float32, 128)
+	for x := 0; x < chunkSize; x++ {
+		for z := 0; z < chunkSize; z++ {
+			for y := 0; y < maxHeight; y++ {
+				if y+1 >= maxHeight || y-1 < 0 ||
+					c.cubes[x][y+1][z] == 0 || c.cubes[x][y-1][z] == 0 ||
+					checkForClearCube(c, right, x+1, y, z) || checkForClearCube(c, left, x-1, y, z) ||
+					checkForClearCube(c, front, x, y, z+1) || checkForClearCube(c, back, x, y, z-1) {
+					c.drawables = append(c.drawables, float32(x+(c.XPos*chunkSize)), float32(y), float32(z+(c.ZPos*chunkSize)), c.cubes[x][y][z])
+				}
+			}
+		}
+	}
+}
+
+func checkForClearCube(ch, neighbour *Chunk, x, y, z int) bool {
+
+	if neighbour != nil && (x >= chunkSize || x < 0 || z >= chunkSize || z < 0) {
+		return neighbour.cubes[((x%chunkSize)+chunkSize)%chunkSize][y][((z%chunkSize)+chunkSize)%chunkSize] == 0
+	} else if x < chunkSize && x >= 0 && z < chunkSize && z >= 0 {
+		//fmt.Printf("X %v, Y %v, Z%v\n", x, y, z)
+		return ch.cubes[x][y][z] == 0
+	} else {
+		return false
 	}
 }
 
