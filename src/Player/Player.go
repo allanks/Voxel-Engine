@@ -138,11 +138,11 @@ func strafe(direction float64) {
 	newZ := user.zPos + (direction * xLook * moveSpeed)
 
 	if !user.gameMap.IsInCube(newX, user.yPos, user.zPos, collisionDistance) &&
-		!user.gameMap.IsInCube(newX, user.yPos+Height, user.zPos, collisionDistance) {
+		!user.gameMap.IsInCube(newX, user.yPos-Height, user.zPos, collisionDistance) {
 		user.xPos = newX
 	}
 	if !user.gameMap.IsInCube(user.xPos, user.yPos, newZ, collisionDistance) &&
-		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, newZ, collisionDistance) {
+		!user.gameMap.IsInCube(user.xPos, user.yPos-Height, newZ, collisionDistance) {
 		user.zPos = newZ
 	}
 }

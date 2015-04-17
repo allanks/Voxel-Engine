@@ -75,6 +75,7 @@ func (gameMap *Level) RenderLevel(vao, typeBuffer uint32) {
 		if c == nil || len(c.drawables) == 0 {
 			continue
 		}
+		//fmt.Printf("Cube X %v, Z %v, num of drawables %v\n", c.XPos, c.ZPos, len(c.drawables))
 
 		gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
 		gl.BufferData(gl.ARRAY_BUFFER, len(c.drawables)*4, gl.Ptr(c.drawables), gl.STATIC_DRAW)
@@ -212,10 +213,11 @@ func (gameMap *Level) Update(c *Chunk) {
 	for x := 0; x < chunkSize; x++ {
 		for z := 0; z < chunkSize; z++ {
 			for y := 0; y < maxHeight; y++ {
-				if y+1 >= maxHeight || y-1 < 0 ||
-					c.cubes[x][y+1][z] == 0 || c.cubes[x][y-1][z] == 0 ||
-					checkForClearCube(c, right, x+1, y, z) || checkForClearCube(c, left, x-1, y, z) ||
-					checkForClearCube(c, front, x, y, z+1) || checkForClearCube(c, back, x, y, z-1) {
+				if c.cubes[x][y][z] != 0 &&
+					(y+1 >= maxHeight || y-1 < 0 ||
+						c.cubes[x][y+1][z] == 0 || c.cubes[x][y-1][z] == 0 ||
+						checkForClearCube(c, right, x+1, y, z) || checkForClearCube(c, left, x-1, y, z) ||
+						checkForClearCube(c, front, x, y, z+1) || checkForClearCube(c, back, x, y, z-1)) {
 					c.drawables = append(c.drawables, float32(x+(c.XPos*chunkSize)), float32(y), float32(z+(c.ZPos*chunkSize)), c.cubes[x][y][z])
 				}
 			}
