@@ -38,7 +38,7 @@ type moveFunc func(float64)
 
 func GenPlayer(xPos, yPos, zPos float64) {
 	lastFrameTime = glfw.GetTime()
-	user = player{xPos, yPos, zPos, -180.0, 0.0, 0.0, true, true, &Terrain.Level{}}
+	user = player{xPos, yPos, zPos, -180.0, 0.0, 0.0, false, true, &Terrain.Level{}}
 	user.gameMap.LoadGameMap(xPos, zPos)
 	go user.loopChunkLoader()
 }
@@ -117,16 +117,16 @@ func move(direction float64) {
 	newY := user.yPos + (direction * yLook * moveSpeed)
 	newZ := user.zPos - (direction * zLook * moveSpeed)
 	if !user.gameMap.IsInCube(newX, user.yPos, user.zPos, collisionDistance) &&
-		!user.gameMap.IsInCube(newX, user.yPos+Height, user.zPos, collisionDistance) {
+		!user.gameMap.IsInCube(newX, user.yPos-Height, user.zPos, collisionDistance) {
 		user.xPos = newX
 	}
 	if user.freeMovement &&
 		!user.gameMap.IsInCube(user.xPos, newY, user.zPos, collisionDistance) &&
-		!user.gameMap.IsInCube(user.xPos, newY+Height, user.zPos, collisionDistance) {
+		!user.gameMap.IsInCube(user.xPos, newY-Height, user.zPos, collisionDistance) {
 		user.yPos = newY
 	}
 	if !user.gameMap.IsInCube(user.xPos, user.yPos, newZ, collisionDistance) &&
-		!user.gameMap.IsInCube(user.xPos, user.yPos+Height, newZ, collisionDistance) {
+		!user.gameMap.IsInCube(user.xPos, user.yPos-Height, newZ, collisionDistance) {
 		user.zPos = newZ
 	}
 }
