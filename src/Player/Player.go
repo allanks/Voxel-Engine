@@ -184,6 +184,6 @@ func (p *player) loopChunkLoader() {
 	}
 }
 
-func Render(vao, typeBuffer uint32) {
-	user.gameMap.RenderLevel(vao, typeBuffer)
+func Render(vao, typeBuffer uint32, offset int32) {
+	user.gameMap.RenderLevel(vao, typeBuffer, offset)
 }

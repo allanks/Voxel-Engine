@@ -6,14 +6,12 @@ import (
 	"image/png"
 	"os"
 
-	"github.com/allanks/Voxel-Engine/src/Graphics"
 	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"gopkg.in/mgo.v2/bson"
 )
 
 const (
 	collisionDistance float64 = 0.15
-	textureAtlas      string  = "resource/texture/textureAtlas.png"
 )
 const (
 	// Cube Types
@@ -59,27 +57,16 @@ var GCubes = []GCube{
 
 var instances int32
 
-func InitialiseGCubeBuffers(textureBuffer uint32) (uint32, uint32) {
-	var vao uint32
-	gl.GenVertexArrays(1, &vao)
-	gl.BindVertexArray(vao)
-
-	var vertexBuffer, typeBuffer, indexBuffer uint32
-	gl.GenBuffers(1, &vertexBuffer)
+func BindCubeVertexBuffers(vertexBuffer, indexBuffer uint32) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, len(cubeVertices)*4, gl.Ptr(cubeVertices), gl.STATIC_DRAW)
-	gl.EnableVertexAttribArray(0)
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
 
-	gl.GenBuffers(1, &typeBuffer)
-	gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
-	gl.EnableVertexAttribArray(1)
-	gl.VertexAttribPointer(1, 4, gl.FLOAT, false, 0, gl.PtrOffset(0))
-	gl.VertexAttribDivisor(1, 1)
-
-	gl.GenBuffers(1, &indexBuffer)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(CubeElements)*4, gl.Ptr(CubeElements), gl.STATIC_DRAW)
+
+}
+
+func GetTextureBuffer() []float32 {
 
 	buffer := []float32{}
 	for i := 0; i < 48; i++ {
@@ -94,31 +81,19 @@ func InitialiseGCubeBuffers(textureBuffer uint32) (uint32, uint32) {
 		}
 		buffer = append(buffer, gCube.Texture...)
 	}
-	gl.GenBuffers(1, &textureBuffer)
-	gl.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0, textureBuffer)
-	gl.BufferData(gl.SHADER_STORAGE_BUFFER, len(buffer)*4, gl.Ptr(buffer), gl.STATIC_DRAW)
-
-	texture, err := Graphics.NewTexture(textureAtlas)
-	if err != nil {
-		panic(err)
-	}
-
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-	gl.BindTexture(gl.TEXTURE_2D, texture)
-
-	return vao, typeBuffer
+	return buffer
 }
 
-func RenderSkyBox(vao, typeBuffer uint32, x, y, z float64) {
+func RenderSkyBox(vao, typeBuffer uint32, offset int32, x, y, z float64) {
 	gl.DepthMask(false)
 
 	gl.BindVertexArray(vao)
 
-	position := []float32{float32(x) - 0.5, float32(y) - 0.5, float32(z) - 0.5, 1}
+	position := []float32{float32(x), float32(y), float32(z), 1}
 	gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, 16, gl.Ptr(position), gl.STATIC_DRAW)
+
+	gl.Uniform3f(offset, -0.5, -0.5, -0.5)
 
 	gl.DrawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_INT, gl.Ptr(nil), int32(1))
 

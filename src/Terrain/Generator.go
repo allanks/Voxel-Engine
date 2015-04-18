@@ -68,17 +68,18 @@ func (gameMap *Level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool
 	return false
 }
 
-func (gameMap *Level) RenderLevel(vao, typeBuffer uint32) {
+func (gameMap *Level) RenderLevel(vao, typeBuffer uint32, offset int32) {
 
 	gl.BindVertexArray(vao)
 	for _, c := range gameMap.chunks {
 		if c == nil || len(c.drawables) == 0 {
 			continue
 		}
-		//fmt.Printf("Cube X %v, Z %v, num of drawables %v\n", c.XPos, c.ZPos, len(c.drawables))
 
 		gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
 		gl.BufferData(gl.ARRAY_BUFFER, len(c.drawables)*4, gl.Ptr(c.drawables), gl.STATIC_DRAW)
+
+		gl.Uniform3f(offset, float32(c.XPos*chunkSize), 0.0, float32(c.ZPos*chunkSize))
 
 		gl.DrawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_INT, gl.Ptr(nil), int32(len(c.drawables)/4))
 	}
@@ -218,7 +219,7 @@ func (gameMap *Level) Update(c *Chunk) {
 						c.cubes[x][y+1][z] == 0 || c.cubes[x][y-1][z] == 0 ||
 						checkForClearCube(c, right, x+1, y, z) || checkForClearCube(c, left, x-1, y, z) ||
 						checkForClearCube(c, front, x, y, z+1) || checkForClearCube(c, back, x, y, z-1)) {
-					c.drawables = append(c.drawables, float32(x+(c.XPos*chunkSize)), float32(y), float32(z+(c.ZPos*chunkSize)), c.cubes[x][y][z])
+					c.drawables = append(c.drawables, float32(x), float32(y), float32(z), c.cubes[x][y][z])
 				}
 			}
 		}

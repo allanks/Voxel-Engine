@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"runtime"
+	"time"
 	"unsafe"
 
 	"github.com/allanks/Voxel-Engine/src/Graphics"
+	"github.com/allanks/Voxel-Engine/src/Mob"
 	"github.com/allanks/Voxel-Engine/src/Player"
 	"github.com/allanks/Voxel-Engine/src/Terrain"
 	"github.com/go-gl/glfw/v3.1/glfw"
@@ -19,6 +21,7 @@ var (
 
 const WindowWidth = 800
 const WindowHeight = 600
+const textureAtlas string = "resource/texture/textureAtlas.png"
 
 func init() {
 	// GLFW event handling must run on the main OS thread
@@ -97,6 +100,17 @@ func initOpenGLProgram(window *glfw.Window) {
 	}
 	gl.UseProgram(program)
 
+	cameraUniform := gl.GetUniformLocation(program, gl.Str("camera\x00"))
+	scale := gl.GetUniformLocation(program, gl.Str("scale\x00"))
+	offset := gl.GetUniformLocation(program, gl.Str("offset\x00"))
+	texParam := gl.GetUniformLocation(program, gl.Str("texParam\x00"))
+	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
+
+	bindProjection(program)
+
+	camera := Player.GetCameraMatrix()
+	gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
+
 	fmt.Println("Initialising GCubes")
 
 	Terrain.InitGCubes()
@@ -105,43 +119,95 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	Player.GenPlayer(5, 68, 5)
 
-	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 100.0)
-	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
-	gl.UniformMatrix4fv(projectionUniform, 1, false, &projection[0])
-
-	camera := Player.GetCameraMatrix()
-	cameraUniform := gl.GetUniformLocation(program, gl.Str("camera\x00"))
-	gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
-
-	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
-
-	textureDataStorageBlock := gl.GetProgramResourceIndex(program, gl.SHADER_STORAGE_BLOCK, gl.Str("texture_data\x00"))
-
 	fmt.Println("Initialising Buffers")
 
-	vao, typeBuffer := Terrain.InitialiseGCubeBuffers(textureDataStorageBlock)
+	var vao, vertexBuffer, typeBuffer, indexBuffer uint32
+	gl.GenVertexArrays(1, &vao)
+	gl.GenBuffers(1, &vertexBuffer)
+	gl.GenBuffers(1, &typeBuffer)
+	gl.GenBuffers(1, &indexBuffer)
+
+	bindBuffers(vao, vertexBuffer, typeBuffer, indexBuffer)
+
+	fmt.Println("Creating Texture Buffer")
+
+	bindTextureBuffer(program)
 
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
 
 	fmt.Println("Starting Draw Loop")
 
+	go func() {
+		ticker := time.Tick(16 * time.Millisecond)
+		for {
+			Player.MovePlayer(window)
+			<-ticker
+		}
+	}()
+
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-		gl.UseProgram(program)
-
-		camera := Player.GetCameraMatrix()
+		camera = Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 		x, y, z := Player.GetPosition()
-		Terrain.RenderSkyBox(vao, typeBuffer, x, y, z)
-		Player.Render(vao, typeBuffer)
 
-		Player.MovePlayer(window)
+		gl.Uniform1f(scale, 1)
+		gl.Uniform2f(texParam, 0, 24)
+		Terrain.BindCubeVertexBuffers(vertexBuffer, indexBuffer)
+		Terrain.RenderSkyBox(vao, typeBuffer, offset, x, y, z)
+		Player.Render(vao, typeBuffer, offset)
+		gl.Uniform3f(offset, 0.0, 0.0, 0.0)
+		Mob.BindVertices(vertexBuffer, indexBuffer, 0)
+		Mob.Render(vao, typeBuffer, scale, texParam)
 
 		window.SwapBuffers()
 		glfw.PollEvents()
 	}
+}
+
+func bindBuffers(vao, vertexBuffer, typeBuffer, indexBuffer uint32) {
+	gl.BindVertexArray(vao)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
+	gl.EnableVertexAttribArray(0)
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
+	gl.EnableVertexAttribArray(1)
+	gl.VertexAttribPointer(1, 4, gl.FLOAT, false, 0, gl.PtrOffset(0))
+	gl.VertexAttribDivisor(1, 1)
+}
+
+func bindProjection(program uint32) {
+	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
+	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 100.0)
+	gl.UniformMatrix4fv(projectionUniform, 1, false, &projection[0])
+}
+
+func bindTextureBuffer(program uint32) {
+	fmt.Println("Loading models")
+
+	mobTexture := Mob.InitModels()
+
+	texture, err := Graphics.NewTexture(textureAtlas)
+	if err != nil {
+		panic(err)
+	}
+
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	gl.BindTexture(gl.TEXTURE_2D, texture)
+
+	textureDataStorageBlock := gl.GetProgramResourceIndex(program, gl.SHADER_STORAGE_BLOCK, gl.Str("texture_data\x00"))
+	textureBuffer := Terrain.GetTextureBuffer()
+	textureBuffer = append(textureBuffer, mobTexture...)
+
+	gl.GenBuffers(1, &textureDataStorageBlock)
+	gl.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0, textureDataStorageBlock)
+	gl.BufferData(gl.SHADER_STORAGE_BUFFER, len(textureBuffer)*4, gl.Ptr(textureBuffer), gl.STATIC_DRAW)
 }
 
 func main() {
@@ -154,6 +220,9 @@ var vertexShader string = `
 
 uniform mat4 projection;
 uniform mat4 camera;
+uniform float scale;
+uniform vec3 offset;
+uniform vec2 texParam;
 
 layout(std430,binding=0) buffer texture_data {
 	vec2 textureData[];
@@ -167,8 +236,12 @@ in int gl_VertexID;
 out vec2 fragTexCoord;
 
 void main() {
-    fragTexCoord =  texData.textureData[gl_VertexID+(int(cube.w)*24)];
-    gl_Position = projection * camera *  (vec4( vert + vec3(cube.x, cube.y, cube.z), 1));
+    fragTexCoord =  texData.textureData[gl_VertexID+(int(texParam.x+(cube.w*texParam.y)))];
+    vec3 vertexData = vert;
+    vertexData.x *= scale;
+    vertexData.y *= scale;
+    vertexData.z *= scale;
+    gl_Position = projection * camera *  (vec4( vertexData + vec3(cube.x + offset.x, cube.y + offset.y, cube.z+offset.z), 1));
 }
 ` + "\x00"
 
@@ -182,8 +255,6 @@ in vec2 fragTexCoord;
 out vec4 outputColor;
 
 void main() {
-	if (fragTexCoord == vec2(0.0,0.0))
-		discard;
     outputColor = texture(tex, (fragTexCoord*0.25));
 }
 ` + "\x00"
