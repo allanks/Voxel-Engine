@@ -56,32 +56,38 @@ var GCubes = []GCube{
 }
 
 var instances int32
+var textureBuffer []float32
 
-func BindCubeVertexBuffers(vertexBuffer, indexBuffer uint32) {
+func BindCubeVertexBuffers(vertexBuffer, indexBuffer, colorBuffer, textureDataStorageBlock uint32) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
 	gl.BufferData(gl.ARRAY_BUFFER, len(cubeVertices)*4, gl.Ptr(cubeVertices), gl.STATIC_DRAW)
 
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(CubeElements)*4, gl.Ptr(CubeElements), gl.STATIC_DRAW)
 
+	gl.BindBuffer(gl.ARRAY_BUFFER, colorBuffer)
+	gl.BufferData(gl.ARRAY_BUFFER, len(cubeColors)*4, gl.Ptr(cubeColors), gl.STATIC_DRAW)
+
+	gl.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0, textureDataStorageBlock)
+	gl.BufferData(gl.SHADER_STORAGE_BUFFER, len(textureBuffer)*4, gl.Ptr(textureBuffer), gl.STATIC_DRAW)
+
 }
 
-func GetTextureBuffer() []float32 {
+func GetTextureBuffer() {
 
-	buffer := []float32{}
-	for i := 0; i < 48; i++ {
-		buffer = append(buffer, 0)
+	textureBuffer = []float32{}
+	for i := 0; i < 24; i++ {
+		textureBuffer = append(textureBuffer, 0, 0)
 	}
 
-	buffer = append(buffer, sky.texture...)
+	textureBuffer = append(textureBuffer, sky.texture...)
 
 	for _, gCube := range GCubes {
 		if gCube.Gtype == 0 {
 			continue
 		}
-		buffer = append(buffer, gCube.Texture...)
+		textureBuffer = append(textureBuffer, gCube.Texture...)
 	}
-	return buffer
 }
 
 func RenderSkyBox(vao, typeBuffer uint32, offset int32, x, y, z float64) {
@@ -131,6 +137,40 @@ var cubeVertices = []float32{
 	1.0, 0.0, 1.0,
 	1.0, 0.0, 0.0,
 	0.0, 0.0, 1.0,
+	0.0, 0.0, 0.0,
+}
+
+var cubeColors = []float32{
+	//  X, Y, Z,
+	// Front face
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	// Back face
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	// Left face
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	// Right face
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	// Top face
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	// Bottom face
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0,
 	0.0, 0.0, 0.0,
 }
 

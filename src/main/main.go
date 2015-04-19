@@ -103,7 +103,9 @@ func initOpenGLProgram(window *glfw.Window) {
 	cameraUniform := gl.GetUniformLocation(program, gl.Str("camera\x00"))
 	scale := gl.GetUniformLocation(program, gl.Str("scale\x00"))
 	offset := gl.GetUniformLocation(program, gl.Str("offset\x00"))
-	texParam := gl.GetUniformLocation(program, gl.Str("texParam\x00"))
+	texParam := gl.GetUniformLocation(program, gl.Str("length\x00"))
+	isTextured := gl.GetUniformLocation(program, gl.Str("textured\x00"))
+	textureDataStorageBlock := gl.GetProgramResourceIndex(program, gl.SHADER_STORAGE_BLOCK, gl.Str("texture_data\x00"))
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
 	bindProjection(program)
@@ -118,20 +120,29 @@ func initOpenGLProgram(window *glfw.Window) {
 	fmt.Println("Generating Player")
 
 	Player.GenPlayer(5, 68, 5)
+	xPos, _ := window.GetCursorPos()
+	window.SetCursorPos(xPos, -180)
 
 	fmt.Println("Initialising Buffers")
 
-	var vao, vertexBuffer, typeBuffer, indexBuffer uint32
+	var vao, vertexBuffer, typeBuffer, indexBuffer, colorBuffer uint32
 	gl.GenVertexArrays(1, &vao)
 	gl.GenBuffers(1, &vertexBuffer)
 	gl.GenBuffers(1, &typeBuffer)
 	gl.GenBuffers(1, &indexBuffer)
+	gl.GenBuffers(1, &colorBuffer)
+	gl.GenBuffers(1, &textureDataStorageBlock)
 
-	bindBuffers(vao, vertexBuffer, typeBuffer, indexBuffer)
+	bindBuffers(vao, vertexBuffer, colorBuffer, typeBuffer, indexBuffer)
+
+	fmt.Println("Loading models")
+
+	Mob.InitModels()
 
 	fmt.Println("Creating Texture Buffer")
 
 	bindTextureBuffer(program)
+	Terrain.GetTextureBuffer()
 
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
@@ -153,13 +164,16 @@ func initOpenGLProgram(window *glfw.Window) {
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 		x, y, z := Player.GetPosition()
 
+		gl.Uniform1i(isTextured, 1)
 		gl.Uniform1f(scale, 1)
-		gl.Uniform2f(texParam, 0, 24)
-		Terrain.BindCubeVertexBuffers(vertexBuffer, indexBuffer)
+		gl.Uniform1f(texParam, 24)
+		Terrain.BindCubeVertexBuffers(vertexBuffer, indexBuffer, colorBuffer, textureDataStorageBlock)
 		Terrain.RenderSkyBox(vao, typeBuffer, offset, x, y, z)
 		Player.Render(vao, typeBuffer, offset)
+
+		gl.Uniform1i(isTextured, 0)
 		gl.Uniform3f(offset, 0.0, 0.0, 0.0)
-		Mob.BindVertices(vertexBuffer, indexBuffer, 0)
+		Mob.BindVertices(vertexBuffer, indexBuffer, colorBuffer, textureDataStorageBlock, 0)
 		Mob.Render(vao, typeBuffer, scale, texParam)
 
 		window.SwapBuffers()
@@ -167,7 +181,7 @@ func initOpenGLProgram(window *glfw.Window) {
 	}
 }
 
-func bindBuffers(vao, vertexBuffer, typeBuffer, indexBuffer uint32) {
+func bindBuffers(vao, vertexBuffer, colorBuffer, typeBuffer, indexBuffer uint32) {
 	gl.BindVertexArray(vao)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
@@ -178,6 +192,10 @@ func bindBuffers(vao, vertexBuffer, typeBuffer, indexBuffer uint32) {
 	gl.EnableVertexAttribArray(1)
 	gl.VertexAttribPointer(1, 4, gl.FLOAT, false, 0, gl.PtrOffset(0))
 	gl.VertexAttribDivisor(1, 1)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, colorBuffer)
+	gl.EnableVertexAttribArray(2)
+	gl.VertexAttribPointer(2, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
 }
 
 func bindProjection(program uint32) {
@@ -187,9 +205,6 @@ func bindProjection(program uint32) {
 }
 
 func bindTextureBuffer(program uint32) {
-	fmt.Println("Loading models")
-
-	mobTexture := Mob.InitModels()
 
 	texture, err := Graphics.NewTexture(textureAtlas)
 	if err != nil {
@@ -200,14 +215,6 @@ func bindTextureBuffer(program uint32) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
-
-	textureDataStorageBlock := gl.GetProgramResourceIndex(program, gl.SHADER_STORAGE_BLOCK, gl.Str("texture_data\x00"))
-	textureBuffer := Terrain.GetTextureBuffer()
-	textureBuffer = append(textureBuffer, mobTexture...)
-
-	gl.GenBuffers(1, &textureDataStorageBlock)
-	gl.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0, textureDataStorageBlock)
-	gl.BufferData(gl.SHADER_STORAGE_BUFFER, len(textureBuffer)*4, gl.Ptr(textureBuffer), gl.STATIC_DRAW)
 }
 
 func main() {
@@ -220,28 +227,35 @@ var vertexShader string = `
 
 uniform mat4 projection;
 uniform mat4 camera;
-uniform float scale;
 uniform vec3 offset;
-uniform vec2 texParam;
+uniform bool textured;
+uniform float scale;
+uniform float length;
 
 layout(std430,binding=0) buffer texture_data {
 	vec2 textureData[];
 }texData;
 
-layout(location=0) in vec3 vert; // cube vertex position
-layout(location=1) in vec4 cube; // instance data, unique to each object (instance)
+layout(location=0) in vec3 vert; // vertex position
+layout(location=1) in vec4 object; // instance data, unique to each object (instance)
+layout(location=2) in vec3 color; // For non-texture items
 
 in int gl_VertexID;
 
-out vec2 fragTexCoord;
+out vec3 fragData;
 
 void main() {
-    fragTexCoord =  texData.textureData[gl_VertexID+(int(texParam.x+(cube.w*texParam.y)))];
+	if(textured) {
+		int ind = gl_VertexID+(int(object.w*length));
+    	fragData =  vec3(texData.textureData[ind], 0);
+	} else {
+		fragData = color;
+	}
     vec3 vertexData = vert;
     vertexData.x *= scale;
     vertexData.y *= scale;
     vertexData.z *= scale;
-    gl_Position = projection * camera *  (vec4( vertexData + vec3(cube.x + offset.x, cube.y + offset.y, cube.z+offset.z), 1));
+    gl_Position = projection * camera *  (vec4( vertexData + vec3(object.x + offset.x, object.y + offset.y, object.z+offset.z), 1));
 }
 ` + "\x00"
 
@@ -249,12 +263,18 @@ var fragmentShader = `
 #version 450
 
 uniform sampler2D tex;
+uniform bool textured;
 
-in vec2 fragTexCoord;
+in vec3 fragData;
 
 out vec4 outputColor;
 
 void main() {
-    outputColor = texture(tex, (fragTexCoord*0.25));
+	if(textured) {
+		vec2 coord = vec2(fragData.x,fragData.y);
+    	outputColor = texture(tex, coord*0.25);
+	} else {
+		outputColor = vec4(fragData, 1);
+	}
 }
 ` + "\x00"
