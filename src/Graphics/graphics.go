@@ -3,21 +3,14 @@ package Graphics
 import (
 	"errors"
 	"fmt"
-	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"image"
 	"image/draw"
 	_ "image/png"
 	"os"
 	"strings"
+
+	"github.com/go-gl/glow/gl-core/4.5/gl"
 )
-
-type drawable interface {
-	getPos() (int32, int32, int32)
-}
-
-type renderable interface {
-	render(*drawable)
-}
 
 func NewTexture(file string) (uint32, error) {
 	imgFile, err := os.Open(file)

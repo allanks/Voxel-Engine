@@ -7,9 +7,8 @@ import (
 	"unsafe"
 
 	"github.com/allanks/Voxel-Engine/src/Graphics"
-	"github.com/allanks/Voxel-Engine/src/Mob"
+	"github.com/allanks/Voxel-Engine/src/Model"
 	"github.com/allanks/Voxel-Engine/src/Player"
-	"github.com/allanks/Voxel-Engine/src/Terrain"
 	"github.com/go-gl/glfw/v3.1/glfw"
 	"github.com/go-gl/glow/gl-core/4.5/gl"
 	"github.com/go-gl/mathgl/mgl32"
@@ -104,7 +103,6 @@ func initOpenGLProgram(window *glfw.Window) {
 	scale := gl.GetUniformLocation(program, gl.Str("scale\x00"))
 	offset := gl.GetUniformLocation(program, gl.Str("offset\x00"))
 	texParam := gl.GetUniformLocation(program, gl.Str("length\x00"))
-	isTextured := gl.GetUniformLocation(program, gl.Str("textured\x00"))
 	textureDataStorageBlock := gl.GetProgramResourceIndex(program, gl.SHADER_STORAGE_BLOCK, gl.Str("texture_data\x00"))
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
@@ -115,7 +113,7 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	fmt.Println("Initialising GCubes")
 
-	Terrain.InitGCubes()
+	Model.InitGCubes()
 
 	fmt.Println("Generating Player")
 
@@ -125,24 +123,23 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	fmt.Println("Initialising Buffers")
 
-	var vao, vertexBuffer, typeBuffer, indexBuffer, colorBuffer uint32
+	var vao, vertexBuffer, normalBuffer, typeBuffer, indexBuffer uint32
 	gl.GenVertexArrays(1, &vao)
 	gl.GenBuffers(1, &vertexBuffer)
+	gl.GenBuffers(1, &normalBuffer)
 	gl.GenBuffers(1, &typeBuffer)
 	gl.GenBuffers(1, &indexBuffer)
-	gl.GenBuffers(1, &colorBuffer)
 	gl.GenBuffers(1, &textureDataStorageBlock)
 
-	bindBuffers(vao, vertexBuffer, colorBuffer, typeBuffer, indexBuffer)
+	bindBuffers(vao, vertexBuffer, normalBuffer, typeBuffer, indexBuffer)
 
 	fmt.Println("Loading models")
 
-	Mob.InitModels()
+	Model.InitModels()
 
 	fmt.Println("Creating Texture Buffer")
 
 	bindTextureBuffer(program)
-	Terrain.GetTextureBuffer()
 
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
@@ -163,39 +160,41 @@ func initOpenGLProgram(window *glfw.Window) {
 		camera = Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 		x, y, z := Player.GetPosition()
+		position := []float32{float32(x), float32(y), float32(z), 1}
 
-		gl.Uniform1i(isTextured, 1)
-		gl.Uniform1f(scale, 1)
-		gl.Uniform1f(texParam, 24)
-		Terrain.BindCubeVertexBuffers(vertexBuffer, indexBuffer, colorBuffer, textureDataStorageBlock)
-		Terrain.RenderSkyBox(vao, typeBuffer, offset, x, y, z)
+		gl.BindVertexArray(vao)
+		Model.BindBuffers(vertexBuffer, normalBuffer, textureDataStorageBlock, scale, texParam, Model.Cube)
+		gl.DepthMask(false)
+		gl.BindVertexArray(vao)
+		gl.Uniform3f(offset, -0.5, -0.5, -0.5)
+		Model.Render(typeBuffer, position, Model.Cube)
+		gl.DepthMask(true)
+		gl.Uniform3f(offset, 0.0, 0.0, 0.0)
 		Player.Render(vao, typeBuffer, offset)
 
-		gl.Uniform1i(isTextured, 0)
-		gl.Uniform3f(offset, 0.0, 0.0, 0.0)
-		Mob.BindVertices(vertexBuffer, indexBuffer, colorBuffer, textureDataStorageBlock, 0)
-		Mob.Render(vao, typeBuffer, scale, texParam)
+		//Model.BindBuffers(vertexBuffer, normalBuffer, textureDataStorageBlock, 1)
+		//Model.Render(vao, typeBuffer)
 
 		window.SwapBuffers()
 		glfw.PollEvents()
 	}
 }
 
-func bindBuffers(vao, vertexBuffer, colorBuffer, typeBuffer, indexBuffer uint32) {
+func bindBuffers(vao, vertexBuffer, normalBuffer, typeBuffer, indexBuffer uint32) {
 	gl.BindVertexArray(vao)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
 	gl.EnableVertexAttribArray(0)
 	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
+	gl.BindBuffer(gl.ARRAY_BUFFER, normalBuffer)
 	gl.EnableVertexAttribArray(1)
-	gl.VertexAttribPointer(1, 4, gl.FLOAT, false, 0, gl.PtrOffset(0))
-	gl.VertexAttribDivisor(1, 1)
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, colorBuffer)
+	gl.BindBuffer(gl.ARRAY_BUFFER, typeBuffer)
 	gl.EnableVertexAttribArray(2)
-	gl.VertexAttribPointer(2, 3, gl.FLOAT, false, 0, gl.PtrOffset(0))
+	gl.VertexAttribPointer(2, 4, gl.FLOAT, false, 0, gl.PtrOffset(0))
+	gl.VertexAttribDivisor(2, 1)
 }
 
 func bindProjection(program uint32) {
@@ -228,7 +227,6 @@ var vertexShader string = `
 uniform mat4 projection;
 uniform mat4 camera;
 uniform vec3 offset;
-uniform bool textured;
 uniform float scale;
 uniform float length;
 
@@ -237,20 +235,16 @@ layout(std430,binding=0) buffer texture_data {
 }texData;
 
 layout(location=0) in vec3 vert; // vertex position
-layout(location=1) in vec4 object; // instance data, unique to each object (instance)
-layout(location=2) in vec3 color; // For non-texture items
+layout(location=1) in vec3 normal; // normal position
+layout(location=2) in vec4 object; // instance data, unique to each object (instance)
 
 in int gl_VertexID;
 
-out vec3 fragData;
+out vec2 fragData;
 
 void main() {
-	if(textured) {
-		int ind = gl_VertexID+(int(object.w*length));
-    	fragData =  vec3(texData.textureData[ind], 0);
-	} else {
-		fragData = color;
-	}
+	int ind = gl_VertexID+(int(object.w*length));
+	fragData = texData.textureData[ind];
     vec3 vertexData = vert;
     vertexData.x *= scale;
     vertexData.y *= scale;
@@ -263,18 +257,12 @@ var fragmentShader = `
 #version 450
 
 uniform sampler2D tex;
-uniform bool textured;
 
-in vec3 fragData;
+in vec2 fragData;
 
 out vec4 outputColor;
 
 void main() {
-	if(textured) {
-		vec2 coord = vec2(fragData.x,fragData.y);
-    	outputColor = texture(tex, coord*0.25);
-	} else {
-		outputColor = vec4(fragData, 1);
-	}
+	outputColor = texture(tex, fragData);
 }
 ` + "\x00"
