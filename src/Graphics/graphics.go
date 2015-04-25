@@ -6,11 +6,14 @@ import (
 	"image"
 	"image/draw"
 	_ "image/png"
+	"io/ioutil"
 	"os"
 	"strings"
 
 	"github.com/go-gl/glow/gl-core/4.5/gl"
 )
+
+const LineEnding string = "\x00"
 
 func NewTexture(file string) (uint32, error) {
 	imgFile, err := os.Open(file)
@@ -51,14 +54,21 @@ func NewTexture(file string) (uint32, error) {
 }
 
 func NewProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
-	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
+
+	bytes, _ := ioutil.ReadFile("resource/shaders/" + vertexShaderSource)
+	shaderString := string(bytes) + LineEnding
+
+	vertexShader, err := compileShader(shaderString, gl.VERTEX_SHADER)
 	if err != nil {
-		return 0, err
+		panic(err)
 	}
 
-	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
+	bytes, _ = ioutil.ReadFile("resource/shaders/" + fragmentShaderSource)
+	fragmentString := string(bytes) + LineEnding
+
+	fragmentShader, err := compileShader(fragmentString, gl.FRAGMENT_SHADER)
 	if err != nil {
-		return 0, err
+		panic(err)
 	}
 
 	program := gl.CreateProgram()

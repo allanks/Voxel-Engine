@@ -93,7 +93,7 @@ func initializeWindow() {
 func initOpenGLProgram(window *glfw.Window) {
 
 	// Configure the vertex and fragment shaders
-	program, err := Graphics.NewProgram(vertexShader, fragmentShader)
+	program, err := Graphics.NewProgram("vertexShader.shad", "fragmentShader.frag")
 	if err != nil {
 		panic(err)
 	}
@@ -220,49 +220,3 @@ func main() {
 	//Terrain.PackTextures()
 	initializeWindow()
 }
-
-var vertexShader string = `
-#version 450
-
-uniform mat4 projection;
-uniform mat4 camera;
-uniform vec3 offset;
-uniform float scale;
-uniform float length;
-
-layout(std430,binding=0) buffer texture_data {
-	vec2 textureData[];
-}texData;
-
-layout(location=0) in vec3 vert; // vertex position
-layout(location=1) in vec3 normal; // normal position
-layout(location=2) in vec4 object; // instance data, unique to each object (instance)
-
-in int gl_VertexID;
-
-out vec2 fragData;
-
-void main() {
-	int ind = gl_VertexID+(int(object.w*length));
-	fragData = texData.textureData[ind];
-    vec3 vertexData = vert;
-    vertexData.x *= scale;
-    vertexData.y *= scale;
-    vertexData.z *= scale;
-    gl_Position = projection * camera *  (vec4( vertexData + vec3(object.x + offset.x, object.y + offset.y, object.z+offset.z), 1));
-}
-` + "\x00"
-
-var fragmentShader = `
-#version 450
-
-uniform sampler2D tex;
-
-in vec2 fragData;
-
-out vec4 outputColor;
-
-void main() {
-	outputColor = texture(tex, fragData);
-}
-` + "\x00"
