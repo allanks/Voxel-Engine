@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	m "math"
 	"runtime"
 	"time"
 	"unsafe"
@@ -20,7 +21,6 @@ var (
 
 const WindowWidth = 800
 const WindowHeight = 600
-const textureAtlas string = "resource/texture/textureAtlas.png"
 
 func init() {
 	// GLFW event handling must run on the main OS thread
@@ -104,6 +104,10 @@ func initOpenGLProgram(window *glfw.Window) {
 	offset := gl.GetUniformLocation(program, gl.Str("offset\x00"))
 	texParam := gl.GetUniformLocation(program, gl.Str("length\x00"))
 	textureDataStorageBlock := gl.GetProgramResourceIndex(program, gl.SHADER_STORAGE_BLOCK, gl.Str("texture_data\x00"))
+	sunColor := gl.GetUniformLocation(program, gl.Str("sun.vColor\x00"))
+	sunDirection := gl.GetUniformLocation(program, gl.Str("sun.vDirection\x00"))
+	sunIntensity := gl.GetUniformLocation(program, gl.Str("sun.intensity\x00"))
+	normalMat := gl.GetUniformLocation(program, gl.Str("normalMatrix\x00"))
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
 	bindProjection(program)
@@ -137,12 +141,22 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	Model.InitModels()
 
-	fmt.Println("Creating Texture Buffer")
-
-	bindTextureBuffer(program)
+	gopher := []float32{0, 63, 5, 0}
 
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
+
+	fmt.Println("Creating light")
+
+	sunX := float32(m.Cos(250.0 * m.Pi / 180))
+	sunY := float32(m.Sin(250.0 * m.Pi / 180))
+	sunZ := float32(m.Cos(60 * m.Pi / 180))
+
+	gl.Uniform3f(sunColor, 1.0, 1.0, 1.0)
+
+	ident := mgl32.Ident4()
+
+	gl.UniformMatrix4fv(normalMat, 1, true, &ident[0])
 
 	fmt.Println("Starting Draw Loop")
 
@@ -159,6 +173,7 @@ func initOpenGLProgram(window *glfw.Window) {
 
 		camera = Player.GetCameraMatrix()
 		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
+
 		x, y, z := Player.GetPosition()
 		position := []float32{float32(x), float32(y), float32(z), 1}
 
@@ -167,13 +182,18 @@ func initOpenGLProgram(window *glfw.Window) {
 		gl.DepthMask(false)
 		gl.BindVertexArray(vao)
 		gl.Uniform3f(offset, -0.5, -0.5, -0.5)
+		gl.Uniform3f(sunDirection, 0.0, 0.0, 0.0)
+		gl.Uniform1f(sunIntensity, 1.0)
 		Model.Render(typeBuffer, position, Model.Cube)
 		gl.DepthMask(true)
 		gl.Uniform3f(offset, 0.0, 0.0, 0.0)
+		gl.Uniform3f(sunDirection, sunX, sunY, sunZ)
+		gl.Uniform1f(sunIntensity, 0.5)
 		Player.Render(vao, typeBuffer, offset)
 
-		//Model.BindBuffers(vertexBuffer, normalBuffer, textureDataStorageBlock, 1)
-		//Model.Render(vao, typeBuffer)
+		gl.BindVertexArray(vao)
+		Model.BindBuffers(vertexBuffer, normalBuffer, textureDataStorageBlock, scale, texParam, Model.Gopher)
+		Model.Render(vao, gopher, Model.Gopher)
 
 		window.SwapBuffers()
 		glfw.PollEvents()
@@ -201,19 +221,6 @@ func bindProjection(program uint32) {
 	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
 	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 100.0)
 	gl.UniformMatrix4fv(projectionUniform, 1, false, &projection[0])
-}
-
-func bindTextureBuffer(program uint32) {
-
-	texture, err := Graphics.NewTexture(textureAtlas)
-	if err != nil {
-		panic(err)
-	}
-
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-	gl.BindTexture(gl.TEXTURE_2D, texture)
 }
 
 func main() {

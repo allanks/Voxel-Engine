@@ -5,6 +5,7 @@ uniform mat4 camera;
 uniform vec3 offset;
 uniform float scale;
 uniform float length;
+uniform mat4 normalMatrix;
 
 layout(std430,binding=0) buffer texture_data {
 	vec2 textureData[];
@@ -17,6 +18,7 @@ layout(location=2) in vec4 object; // instance data, unique to each object (inst
 in int gl_VertexID;
 
 out vec2 fragData;
+smooth out vec3 vNormal;
 
 void main() {
 	int ind = gl_VertexID+(int(object.w*length));
@@ -26,4 +28,6 @@ void main() {
     vertexData.y *= scale;
     vertexData.z *= scale;
     gl_Position = projection * camera *  (vec4( vertexData + vec3(object.x + offset.x, object.y + offset.y, object.z+offset.z), 1));
+    vec4 vRes = normalMatrix*vec4(normal, 0.0); 
+    vNormal = vRes.xyz;
 }
