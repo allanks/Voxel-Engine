@@ -174,6 +174,8 @@ func OnKey(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw
 		}
 	case glfw.KeyP:
 		fmt.Printf("Player X %v, Y %v, Z %v Free %v\nIsInCube %v\n", int(m.Floor(user.xPos)), int(m.Floor(user.yPos)), int(m.Floor(user.zPos)), user.freeMovement, user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance))
+	case glfw.KeyC:
+		fmt.Printf("Camera %v\n", GetCameraMatrix())
 	}
 }
 

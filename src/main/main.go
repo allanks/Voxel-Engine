@@ -93,27 +93,26 @@ func initializeWindow() {
 func initOpenGLProgram(window *glfw.Window) {
 
 	// Configure the vertex and fragment shaders
-	program, err := Graphics.NewProgram("vertexShader.shad", "fragmentShader.frag")
+	cubeProgram, err := Graphics.NewProgram("cubeShader.shad", "cubeFrag.frag")
 	if err != nil {
 		panic(err)
 	}
-	gl.UseProgram(program)
+	mobProgram, err := Graphics.NewProgram("mobShader.shad", "mobFragment.frag")
+	if err != nil {
+		panic(err)
+	}
 
-	cameraUniform := gl.GetUniformLocation(program, gl.Str("camera\x00"))
-	scale := gl.GetUniformLocation(program, gl.Str("scale\x00"))
-	offset := gl.GetUniformLocation(program, gl.Str("offset\x00"))
-	texParam := gl.GetUniformLocation(program, gl.Str("length\x00"))
-	textureDataStorageBlock := gl.GetProgramResourceIndex(program, gl.SHADER_STORAGE_BLOCK, gl.Str("texture_data\x00"))
-	sunColor := gl.GetUniformLocation(program, gl.Str("sun.vColor\x00"))
-	sunDirection := gl.GetUniformLocation(program, gl.Str("sun.vDirection\x00"))
-	sunIntensity := gl.GetUniformLocation(program, gl.Str("sun.intensity\x00"))
-	normalMat := gl.GetUniformLocation(program, gl.Str("normalMatrix\x00"))
-	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
+	length := gl.GetUniformLocation(cubeProgram, gl.Str("length\x00"))
+	offset := gl.GetUniformLocation(cubeProgram, gl.Str("offset\x00"))
+	normalMat := gl.GetUniformLocation(cubeProgram, gl.Str("normalMatrix\x00"))
+	gl.BindFragDataLocation(cubeProgram, 0, gl.Str("outputColor\x00"))
 
-	bindProjection(program)
+	scale := gl.GetUniformLocation(mobProgram, gl.Str("scale\x00"))
+	mobOffset := gl.GetUniformLocation(mobProgram, gl.Str("offset\x00"))
+	mobNormalMat := gl.GetUniformLocation(mobProgram, gl.Str("normalMatrix\x00"))
+	gl.BindFragDataLocation(mobProgram, 0, gl.Str("outputColor\x00"))
 
 	camera := Player.GetCameraMatrix()
-	gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 
 	fmt.Println("Initialising GCubes")
 
@@ -127,15 +126,18 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	fmt.Println("Initialising Buffers")
 
-	var vao, vertexBuffer, normalBuffer, typeBuffer, indexBuffer uint32
+	var vao, vertexBuffer, normalBuffer, typeBuffer, indexBuffer, uvBuffer, stateBufferStorageBlock, sunBufferStorageBlock, textureDataStorageBlock uint32
 	gl.GenVertexArrays(1, &vao)
 	gl.GenBuffers(1, &vertexBuffer)
 	gl.GenBuffers(1, &normalBuffer)
 	gl.GenBuffers(1, &typeBuffer)
 	gl.GenBuffers(1, &indexBuffer)
+	gl.GenBuffers(1, &uvBuffer)
+	gl.GenBuffers(1, &stateBufferStorageBlock)
+	gl.GenBuffers(1, &sunBufferStorageBlock)
 	gl.GenBuffers(1, &textureDataStorageBlock)
 
-	bindBuffers(vao, vertexBuffer, normalBuffer, typeBuffer, indexBuffer)
+	bindBuffers(vao, vertexBuffer, normalBuffer, typeBuffer, indexBuffer, uvBuffer, textureDataStorageBlock, stateBufferStorageBlock, sunBufferStorageBlock)
 
 	fmt.Println("Loading models")
 
@@ -148,15 +150,31 @@ func initOpenGLProgram(window *glfw.Window) {
 
 	fmt.Println("Creating light")
 
-	sunX := float32(m.Cos(250.0 * m.Pi / 180))
-	sunY := float32(m.Sin(250.0 * m.Pi / 180))
-	sunZ := float32(m.Cos(60 * m.Pi / 180))
+	var sun [9]float32
 
-	gl.Uniform3f(sunColor, 1.0, 1.0, 1.0)
+	bindProjection(stateBufferStorageBlock)
+
+	// Sun color
+	sun[0] = 1.0
+	sun[1] = 1.0
+	sun[2] = 1.0
+	sun[3] = 0.0
+	// Sun position
+	sun[4] = float32(m.Cos(250.0 * m.Pi / 180))
+	sun[5] = float32(m.Sin(250.0 * m.Pi / 180))
+	sun[6] = float32(m.Cos(60 * m.Pi / 180))
+	sun[7] = 0.0
+	// Sun intensity
+	sun[8] = 0.8
+
+	gl.BindBuffer(gl.UNIFORM_BUFFER, sunBufferStorageBlock)
+	gl.BufferSubData(gl.UNIFORM_BUFFER, 0, 4*len(sun), gl.Ptr(&sun[0]))
 
 	ident := mgl32.Ident4()
 
 	gl.UniformMatrix4fv(normalMat, 1, true, &ident[0])
+	gl.UniformMatrix4fv(mobNormalMat, 1, true, &ident[0])
+	gl.Uniform3f(mobOffset, 0.0, 0.0, 0.0)
 
 	fmt.Println("Starting Draw Loop")
 
@@ -172,27 +190,26 @@ func initOpenGLProgram(window *glfw.Window) {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		camera = Player.GetCameraMatrix()
-		gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
+
+		gl.BindBuffer(gl.UNIFORM_BUFFER, stateBufferStorageBlock)
+		gl.BufferSubData(gl.UNIFORM_BUFFER, 4*16, 4*len(camera), gl.Ptr(&camera[0]))
 
 		x, y, z := Player.GetPosition()
 		position := []float32{float32(x), float32(y), float32(z), 1}
 
+		gl.UseProgram(cubeProgram)
 		gl.BindVertexArray(vao)
-		Model.BindBuffers(vertexBuffer, normalBuffer, textureDataStorageBlock, scale, texParam, Model.Cube)
+		Model.BindBuffers(vertexBuffer, normalBuffer, textureDataStorageBlock, uvBuffer, scale, length, Model.Cube)
 		gl.DepthMask(false)
-		gl.BindVertexArray(vao)
 		gl.Uniform3f(offset, -0.5, -0.5, -0.5)
-		gl.Uniform3f(sunDirection, 0.0, 0.0, 0.0)
-		gl.Uniform1f(sunIntensity, 1.0)
 		Model.Render(typeBuffer, position, Model.Cube)
 		gl.DepthMask(true)
 		gl.Uniform3f(offset, 0.0, 0.0, 0.0)
-		gl.Uniform3f(sunDirection, sunX, sunY, sunZ)
-		gl.Uniform1f(sunIntensity, 0.5)
 		Player.Render(vao, typeBuffer, offset)
 
+		gl.UseProgram(mobProgram)
 		gl.BindVertexArray(vao)
-		Model.BindBuffers(vertexBuffer, normalBuffer, textureDataStorageBlock, scale, texParam, Model.Gopher)
+		Model.BindBuffers(vertexBuffer, normalBuffer, textureDataStorageBlock, uvBuffer, scale, length, Model.Gopher)
 		Model.Render(vao, gopher, Model.Gopher)
 
 		window.SwapBuffers()
@@ -200,7 +217,13 @@ func initOpenGLProgram(window *glfw.Window) {
 	}
 }
 
-func bindBuffers(vao, vertexBuffer, normalBuffer, typeBuffer, indexBuffer uint32) {
+func bindProjection(stateBufferStorageBlock uint32) {
+	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 100.0)
+	gl.BindBuffer(gl.UNIFORM_BUFFER, stateBufferStorageBlock)
+	gl.BufferSubData(gl.UNIFORM_BUFFER, 0, 4*len(projection), gl.Ptr(&projection[0]))
+}
+
+func bindBuffers(vao, vertexBuffer, normalBuffer, typeBuffer, indexBuffer, uvBuffer, textureDataStorageBlock, stateBufferStorageBlock, sunBufferStorageBlock uint32) {
 	gl.BindVertexArray(vao)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
@@ -215,12 +238,20 @@ func bindBuffers(vao, vertexBuffer, normalBuffer, typeBuffer, indexBuffer uint32
 	gl.EnableVertexAttribArray(2)
 	gl.VertexAttribPointer(2, 4, gl.FLOAT, false, 0, gl.PtrOffset(0))
 	gl.VertexAttribDivisor(2, 1)
-}
 
-func bindProjection(program uint32) {
-	projectionUniform := gl.GetUniformLocation(program, gl.Str("projection\x00"))
-	projection := mgl32.Perspective(70.0, float32(WindowWidth)/WindowHeight, 0.1, 100.0)
-	gl.UniformMatrix4fv(projectionUniform, 1, false, &projection[0])
+	gl.BindBuffer(gl.ARRAY_BUFFER, uvBuffer)
+	gl.EnableVertexAttribArray(3)
+	gl.VertexAttribPointer(3, 2, gl.FLOAT, false, 0, gl.PtrOffset(0))
+
+	gl.BindBufferBase(gl.UNIFORM_BUFFER, 0, stateBufferStorageBlock)
+	gl.BufferData(gl.UNIFORM_BUFFER, 32*4, nil, gl.STATIC_DRAW)
+	gl.BindBufferRange(gl.UNIFORM_BUFFER, 0, stateBufferStorageBlock, 0, 32*4)
+
+	gl.BindBufferBase(gl.UNIFORM_BUFFER, 1, sunBufferStorageBlock)
+	gl.BufferData(gl.UNIFORM_BUFFER, 9*4, nil, gl.STATIC_DRAW)
+	gl.BindBufferRange(gl.UNIFORM_BUFFER, 1, sunBufferStorageBlock, 0, 9*4)
+
+	gl.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0, textureDataStorageBlock)
 }
 
 func main() {
