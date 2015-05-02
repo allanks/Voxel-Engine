@@ -30,27 +30,79 @@ type clientChunk struct {
 	drawables []float32
 }
 
-func (gameMap *Level) IsInCube(xPos, yPos, zPos, collisionDistance float64) bool {
+func (gameMap *Level) GetYCubes(xPos, yPos, zPos, height float64) []float32 {
 	pX := int(m.Floor(xPos))
-	//pY := int(m.Floor(yPos))
+	pY := int(m.Floor(yPos))
+	nY := int(m.Floor(yPos - height))
 	pZ := int(m.Floor(zPos))
-	pXpC := ((int(m.Floor(xPos+collisionDistance)) % chunkSize) + chunkSize) % chunkSize
-	pXmC := ((int(m.Floor(xPos-collisionDistance)) % chunkSize) + chunkSize) % chunkSize
-	pZpC := ((int(m.Floor(zPos+collisionDistance)) % chunkSize) + chunkSize) % chunkSize
-	pZmC := ((int(m.Floor(zPos-collisionDistance)) % chunkSize) + chunkSize) % chunkSize
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("X+ %v X- %v Z+ %v Z- %v\n", pXpC, pXmC, pZpC, pZmC)
-		}
-	}()
+	cubes := []float32{}
 	for _, c := range gameMap.chunks {
 		if c == nil {
 			continue
 		}
-		if pX == c.XPos*chunkSize && pZ == c.ZPos*chunkSize {
+		if isInRange(pX/chunkSize, c.XPos) && isInRange(pZ/chunkSize, c.ZPos) {
+			for i := 0; i < len(c.drawables)/4; i++ {
+				if int(m.Floor(float64(c.drawables[(i*4)+3]))) != DataType.Empty &&
+					int(m.Floor(float64(c.drawables[i*4])))+(c.XPos*chunkSize) == pX &&
+					int(m.Floor(float64(c.drawables[(i*4)+2])))+(c.ZPos*chunkSize) == pZ &&
+					(isInRange(int(m.Floor(float64(c.drawables[(i*4)+1]))), pY) ||
+						isInRange(int(m.Floor(float64(c.drawables[(i*4)+1]))), nY)) {
+					cubes = append(cubes, c.drawables[i*4]+float32(c.XPos*chunkSize), c.drawables[(i*4)+1], c.drawables[(i*4)+2]+float32(c.ZPos*chunkSize))
+				}
+			}
 		}
 	}
-	return false
+	return cubes
+}
+
+func (gameMap *Level) GetCubes(query []DataType.Pos) []DataType.Pos {
+	cubes := []DataType.Pos{}
+	for _, cubeAt := range query {
+		qx, qy, qz := DataType.FloorToInt(cubeAt.XPos), DataType.FloorToInt(cubeAt.YPos), DataType.FloorToInt(cubeAt.ZPos)
+		for _, chunk := range gameMap.chunks {
+			if qx/chunkSize == chunk.XPos && qz/chunkSize == chunk.ZPos {
+				for i := 0; i < len(chunk.drawables)/4; i++ {
+					if DataType.FloorToInt(chunk.drawables[(i*4)+3]) != DataType.Empty &&
+						DataType.FloorToInt(chunk.drawables[i*4])+(chunk.XPos*chunkSize) == qx &&
+						DataType.FloorToInt(chunk.drawables[(i*4)+1]) == qy &&
+						DataType.FloorToInt(chunk.drawables[(i*4)+2])+(chunk.ZPos*chunkSize) == qz {
+						cubes = append(cubes, DataType.Pos{
+							XPos: chunk.drawables[i*4] + float32(chunk.XPos*chunkSize),
+							YPos: chunk.drawables[(i*4)+1],
+							ZPos: chunk.drawables[(i*4)+2] + float32(chunk.ZPos*chunkSize)})
+					}
+				}
+			}
+		}
+	}
+	return cubes
+}
+
+func (gameMap *Level) GetXZCubes(xPos, yPos, zPos float64) []float32 {
+	pX := int(m.Floor(xPos))
+	pY := int(m.Floor(yPos))
+	pZ := int(m.Floor(zPos))
+	cubes := []float32{}
+	for _, c := range gameMap.chunks {
+		if c == nil {
+			continue
+		}
+		if isInRange(pX/chunkSize, c.XPos) && isInRange(pZ/chunkSize, c.ZPos) {
+			for i := 0; i < len(c.drawables)/4; i++ {
+				if int(m.Floor(float64(c.drawables[(i*4)+3]))) != DataType.Empty &&
+					int(m.Floor(float64(c.drawables[(i*4)+1]))) == pY &&
+					isInRange(int(m.Floor(float64(c.drawables[i*4])))+(c.XPos*chunkSize), pX) &&
+					isInRange(int(m.Floor(float64(c.drawables[(i*4)+2])))+(c.ZPos*chunkSize), pZ) {
+					cubes = append(cubes, c.drawables[i*4]+float32(c.XPos*chunkSize), c.drawables[(i*4)+1], c.drawables[(i*4)+2]+float32(c.ZPos*chunkSize))
+				}
+			}
+		}
+	}
+	return cubes
+}
+
+func isInRange(static, dynamic int) bool {
+	return static == dynamic || static == dynamic+1 || static == dynamic-1
 }
 
 func (gameMap *Level) RenderLevel(vao, typeBuffer uint32, offset int32) {

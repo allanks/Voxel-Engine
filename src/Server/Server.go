@@ -13,17 +13,6 @@ import (
 )
 
 const (
-	// Cube Types
-	Empty = iota
-	SkyBox
-	Dirt
-	Grass
-	Stone
-	CobbleStone
-	Gravel
-)
-
-const (
 	mongodb   string = "localhost:27017"
 	chunkSize int    = 16
 	maxHeight int    = 128
@@ -115,15 +104,15 @@ func genChunk(c *DataType.Chunk) *DataType.CubeChunk {
 			var cubeType uint8
 			for y := -1; y < h+1; y++ {
 				if y >= h || y < 0 {
-					cubeType = Empty
+					cubeType = DataType.Empty
 				} else if (y + 1) >= h {
-					cubeType = Grass
+					cubeType = DataType.Grass
 				} else if (y + 5) >= h {
-					cubeType = Dirt
+					cubeType = DataType.Dirt
 				} else if (y + 10) >= h {
-					cubeType = Gravel
+					cubeType = DataType.Gravel
 				} else {
-					cubeType = Stone
+					cubeType = DataType.Stone
 				}
 				cubes = append(cubes, &cube{ChunkID: c.ID, XPos: int8(x), YPos: int8(y), ZPos: int8(z), CubeType: uint8(cubeType)})
 			}
@@ -139,7 +128,7 @@ func filter(cubes []*cube) []float32 {
 	drawables := []float32{}
 	for _, current := range cubes {
 		current.Visible = false
-		if current.CubeType == Empty {
+		if current.CubeType == DataType.Empty {
 			continue
 		}
 		for _, other := range cubes {
@@ -149,7 +138,7 @@ func filter(cubes []*cube) []float32 {
 			xSame := (other.XPos - current.XPos) == 0
 			ySame := (other.YPos - current.YPos) == 0
 			zSame := (other.ZPos - current.ZPos) == 0
-			if other.CubeType == Empty && ((xDiff && ySame && zSame) || (xSame && yDiff && zSame) || (xSame && ySame && zDiff)) {
+			if other.CubeType == DataType.Empty && ((xDiff && ySame && zSame) || (xSame && yDiff && zSame) || (xSame && ySame && zDiff)) {
 				current.Visible = true
 				drawables = append(drawables, float32(current.XPos), float32(current.YPos), float32(current.ZPos), float32(current.CubeType))
 				break
