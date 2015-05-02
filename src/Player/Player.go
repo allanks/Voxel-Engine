@@ -38,8 +38,10 @@ type moveFunc func(float64)
 
 func GenPlayer(xPos, yPos, zPos float64) {
 	lastFrameTime = glfw.GetTime()
-	user = player{xPos, yPos, zPos, -180.0, 0.0, 0.0, false, true, &Terrain.Level{}}
-	user.gameMap.LoadGameMap(xPos, zPos)
+	user = player{xPos, yPos, zPos, -180.0, 0.0, 0.0, true, true, &Terrain.Level{}}
+
+	Terrain.StartConnection()
+	user.gameMap.InitChunk(int(m.Floor(float64(xPos))), int(m.Floor(float64(zPos))))
 	go user.loopChunkLoader()
 }
 
@@ -176,6 +178,8 @@ func OnKey(window *glfw.Window, k glfw.Key, s int, action glfw.Action, mods glfw
 		fmt.Printf("Player X %v, Y %v, Z %v Free %v\nIsInCube %v\n", int(m.Floor(user.xPos)), int(m.Floor(user.yPos)), int(m.Floor(user.zPos)), user.freeMovement, user.gameMap.IsInCube(user.xPos, user.yPos, user.zPos, collisionDistance))
 	case glfw.KeyC:
 		fmt.Printf("Camera %v\n", GetCameraMatrix())
+	case glfw.KeyG:
+		user.gameMap.PrintChunks()
 	}
 }
 

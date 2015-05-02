@@ -1,4 +1,4 @@
-package Terrain
+package Server
 
 import (
 	m "math"
@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-type simplexNoise struct {
+type SimplexNoise struct {
 	octaves                 []noise
 	frequencies, amplitudes []float64
 }
 
-func createSimplexNoise(seed int64, height, persistence float64) *simplexNoise {
+func CreateSimplexNoise(seed int64, height, persistence float64) *SimplexNoise {
 	numOfOctaves := int(m.Ceil(m.Log2(height)))
-	simplex := simplexNoise{}
+	simplex := SimplexNoise{}
 
 	simplex.octaves = make([]noise, numOfOctaves)
 	simplex.amplitudes = make([]float64, numOfOctaves)
@@ -34,7 +34,7 @@ func createSimplexNoise(seed int64, height, persistence float64) *simplexNoise {
 	return &simplex
 }
 
-func (simplex *simplexNoise) getNoise(x, z float64) float64 {
+func (simplex *SimplexNoise) GetNoise(x, z float64) float64 {
 	result := float64(0)
 
 	for i := 0; i < len(simplex.octaves); i++ {
