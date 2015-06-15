@@ -1,0 +1,23 @@
+#version 450
+
+layout(std140,binding=0) uniform State {
+    mat4 projection;
+    mat4 camera;
+}state;
+
+
+layout(std430,binding=0) buffer texture_data {
+	vec2 textureData[];
+}texData;
+
+layout(location=0) in vec2 vert; // vertex position
+layout(location=1) in vec4 object; // instance data, unique to each object (instance)
+in int gl_VertexID;
+
+out vec2 fragData;
+
+void main() {
+   int ind = gl_VertexID+(int(object.w*4));
+   gl_Position = state.projection * state.camera * (vec4(vert, 0, 1) + vec4(object.x,object.y,0,0));
+   fragData = texData.textureData[ind];
+}
