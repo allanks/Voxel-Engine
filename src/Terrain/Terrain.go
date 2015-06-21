@@ -9,7 +9,6 @@ import (
 
 	"github.com/allanks/Voxel-Engine/src/Model"
 	"github.com/allanks/Voxel-Engine/src/Server/DataType"
-	"github.com/go-gl/glow/gl-core/4.5/gl"
 )
 
 const (
@@ -105,15 +104,15 @@ func isInRange(static, dynamic int) bool {
 	return static == dynamic || static == dynamic+1 || static == dynamic-1
 }
 
-func (gameMap *Level) RenderLevel(vao, typeBuffer uint32, offset int32) {
+func (gameMap *Level) RenderLevel() {
 
 	for _, c := range gameMap.chunks {
 		if c == nil || len(c.drawables) == 0 {
 			continue
 		}
 
-		gl.Uniform3f(offset, float32(c.XPos*chunkSize), 0.0, float32(c.ZPos*chunkSize))
-		Model.Render(typeBuffer, c.drawables, Model.Cube)
+		Model.BindBuffers([]float32{float32(c.XPos * chunkSize), 0.0, float32(c.ZPos * chunkSize)}, Model.Cube)
+		Model.Render(c.drawables, Model.Cube)
 	}
 }
 

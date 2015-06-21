@@ -98,9 +98,9 @@ func GetCameraMatrix() mgl32.Mat4 {
 
 func checkCubes(cubes []DataType.Pos, current, final DataType.Pos) bool {
 	for _, cube := range cubes {
-		if (current.XPos < cube.XPos && final.XPos > cube.XPos) || (current.XPos > cube.XPos && final.XPos < cube.XPos) ||
-			(current.YPos < cube.YPos && final.YPos > cube.YPos) || (current.YPos > cube.YPos && final.YPos < cube.YPos) ||
-			(current.ZPos < cube.ZPos && final.ZPos > cube.ZPos) || (current.ZPos > cube.ZPos && final.ZPos < cube.ZPos) {
+		if final.XPos > cube.XPos && final.XPos < (cube.XPos+1) &&
+			final.YPos > cube.YPos && final.YPos < (cube.YPos-1) &&
+			final.ZPos > cube.ZPos && final.ZPos < (cube.ZPos+1) {
 			return false
 		}
 	}
@@ -224,6 +224,6 @@ func (p *player) loopChunkLoader() {
 	}
 }
 
-func Render(vao, typeBuffer uint32, offset int32) {
-	user.gameMap.RenderLevel(vao, typeBuffer, offset)
+func Render() {
+	user.gameMap.RenderLevel()
 }
